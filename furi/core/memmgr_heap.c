@@ -39,7 +39,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stm32wbxx.h>
-#include <furi_hal_console.h>
+#include <core/log.h>
 #include <core/common_defines.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
@@ -47,10 +47,14 @@ all the API functions to use the MPU wrappers.  That should only be done when
 task.h is included from an application file. */
 #define MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-#include "FreeRTOS.h"
-#include "task.h"
+#include <FreeRTOS.h>
+#include <task.h>
 
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
+
+#ifdef HEAP_PRINT_DEBUG
+#error This feature is broken, logging transport must be replaced with RTT
+#endif
 
 #if(configSUPPORT_DYNAMIC_ALLOCATION == 0)
 #error This file must not be used if configSUPPORT_DYNAMIC_ALLOCATION is 0
@@ -115,8 +119,9 @@ static size_t xBlockAllocatedBit = 0;
 #include <m-dict.h>
 
 /* Allocation tracking types */
-DICT_DEF2(MemmgrHeapAllocDict, uint32_t, uint32_t)
-DICT_DEF2(
+DICT_DEF2(MemmgrHeapAllocDict, uint32_t, uint32_t) //-V1048
+
+DICT_DEF2( //-V1048
     MemmgrHeapThreadDict,
     uint32_t,
     M_DEFAULT_OPLIST,
@@ -285,13 +290,13 @@ static void print_heap_init() {
 
     // {PHStart|heap_start|heap_end}
     FURI_CRITICAL_ENTER();
-    furi_hal_console_puts("{PHStart|");
+    furi_log_puts("{PHStart|");
     ultoa(heap_start, tmp_str, 16);
-    furi_hal_console_puts(tmp_str);
-    furi_hal_console_puts("|");
+    furi_log_puts(tmp_str);
+    furi_log_puts("|");
     ultoa(heap_end, tmp_str, 16);
-    furi_hal_console_puts(tmp_str);
-    furi_hal_console_puts("}\r\n");
+    furi_log_puts(tmp_str);
+    furi_log_puts("}\r\n");
     FURI_CRITICAL_EXIT();
 }
 
@@ -304,15 +309,15 @@ static void print_heap_malloc(void* ptr, size_t size) {
 
     // {thread name|m|address|size}
     FURI_CRITICAL_ENTER();
-    furi_hal_console_puts("{");
-    furi_hal_console_puts(name);
-    furi_hal_console_puts("|m|0x");
+    furi_log_puts("{");
+    furi_log_puts(name);
+    furi_log_puts("|m|0x");
     ultoa((unsigned long)ptr, tmp_str, 16);
-    furi_hal_console_puts(tmp_str);
-    furi_hal_console_puts("|");
+    furi_log_puts(tmp_str);
+    furi_log_puts("|");
     utoa(size, tmp_str, 10);
-    furi_hal_console_puts(tmp_str);
-    furi_hal_console_puts("}\r\n");
+    furi_log_puts(tmp_str);
+    furi_log_puts("}\r\n");
     FURI_CRITICAL_EXIT();
 }
 
@@ -325,12 +330,12 @@ static void print_heap_free(void* ptr) {
 
     // {thread name|f|address}
     FURI_CRITICAL_ENTER();
-    furi_hal_console_puts("{");
-    furi_hal_console_puts(name);
-    furi_hal_console_puts("|f|0x");
+    furi_log_puts("{");
+    furi_log_puts(name);
+    furi_log_puts("|f|0x");
     ultoa((unsigned long)ptr, tmp_str, 16);
-    furi_hal_console_puts(tmp_str);
-    furi_hal_console_puts("}\r\n");
+    furi_log_puts(tmp_str);
+    furi_log_puts("}\r\n");
     FURI_CRITICAL_EXIT();
 }
 #endif
@@ -481,7 +486,7 @@ void* pvPortMalloc(size_t xWantedSize) {
 
     configASSERT((((size_t)pvReturn) & (size_t)portBYTE_ALIGNMENT_MASK) == 0);
 
-    furi_check(pvReturn);
+    furi_check(pvReturn, xWantedSize ? "out of memory" : "malloc(0)");
     pvReturn = memset(pvReturn, 0, to_wipe);
     return pvReturn;
 }

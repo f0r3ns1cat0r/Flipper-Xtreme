@@ -1,11 +1,10 @@
-from SCons.Platform import TempFileMunge
-from SCons.Node import FS
-from SCons.Errors import UserError
-
-
-import os
 import multiprocessing
+import os
 import pathlib
+
+from SCons.Errors import UserError
+from SCons.Node import FS
+from SCons.Platform import TempFileMunge
 
 SetOption("num_jobs", multiprocessing.cpu_count())
 SetOption("max_drift", 1)
@@ -26,33 +25,10 @@ forward_os_env = {
     "PATH": os.environ["PATH"],
 }
 
-# Proxying environment to child processes & scripts
-variables_to_forward = [
-    # CI/CD variables
-    "WORKFLOW_BRANCH_OR_TAG",
-    "DIST_SUFFIX",
-    # Python & other tools
-    "HOME",
-    "APPDATA",
-    "PYTHONHOME",
-    "PYTHONNOUSERSITE",
-    "TMP",
-    "TEMP",
-    # Colors for tools
-    "TERM",
-]
-
-if proxy_env := GetOption("proxy_env"):
-    variables_to_forward.extend(proxy_env.split(","))
-
-for env_value_name in variables_to_forward:
-    if environ_value := os.environ.get(env_value_name, None):
-        forward_os_env[env_value_name] = environ_value
 
 # Core environment init - loads SDK state, sets up paths, etc.
 core_env = Environment(
     variables=ufbt_variables,
-    ENV=forward_os_env,
     UFBT_STATE_DIR=ufbt_state_dir,
     UFBT_CURRENT_SDK_DIR=ufbt_current_sdk_dir,
     UFBT_SCRIPT_DIR=ufbt_script_dir,
@@ -67,19 +43,30 @@ core_env.Append(CPPDEFINES=GetOption("extra_defines"))
 
 # Now we can import stuff bundled with SDK - it was added to sys.path by ufbt_state
 
-from fbt.util import (
-    tempfile_arg_esc_func,
-    single_quote,
-    extract_abs_dir,
-    extract_abs_dir_path,
-    wrap_tempfile,
-    path_as_posix,
-)
-from fbt.appmanifest import FlipperAppType
+from fbt.appmanifest import FlipperApplication, FlipperAppType
 from fbt.sdk.cache import SdkCache
+from fbt.util import (
+    FORWARDED_ENV_VARIABLES,
+    path_as_posix,
+    resolve_real_dir_node,
+    single_quote,
+    tempfile_arg_esc_func,
+    wrap_tempfile,
+)
+
+variables_to_forward = list(FORWARDED_ENV_VARIABLES)
+
+if proxy_env := GetOption("proxy_env"):
+    variables_to_forward.extend(proxy_env.split(","))
+
+for env_value_name in variables_to_forward:
+    if environ_value := os.environ.get(env_value_name, None):
+        forward_os_env[env_value_name] = environ_value
+
 
 # Base environment with all tools loaded from SDK
 env = core_env.Clone(
+    ENV=forward_os_env,
     toolpath=[core_env["FBT_SCRIPT_DIR"].Dir("fbt_tools")],
     tools=[
         "fbt_tweaks",
@@ -98,6 +85,7 @@ env = core_env.Clone(
         "fbt_apps",
         "fbt_extapps",
         "fbt_assets",
+        "fbt_envhooks",
         ("compilation_db", {"COMPILATIONDB_COMSTR": "\tCDB\t${TARGET}"}),
     ],
     FBT_FAP_DEBUG_ELF_ROOT=ufbt_build_dir,
@@ -106,8 +94,9 @@ env = core_env.Clone(
     PROGSUFFIX=".elf",
     TEMPFILEARGESCFUNC=tempfile_arg_esc_func,
     SINGLEQUOTEFUNC=single_quote,
-    ABSPATHGETTERFUNC=extract_abs_dir_path,
+    ABSPATHGETTERFUNC=resolve_real_dir_node,
     APPS=[],
+    EXTRA_EXT_APPS=[],
     UFBT_API_VERSION=SdkCache(
         core_env.subst("$SDK_DEFINITION"), load_version_only=True
     ).version,
@@ -116,6 +105,8 @@ env = core_env.Clone(
 
 wrap_tempfile(env, "LINKCOM")
 wrap_tempfile(env, "ARCOM")
+
+env.PreConfigureUfbtEnvionment()
 
 # print(env.Dump())
 
@@ -143,24 +134,20 @@ dist_env = env.Clone(
     ],
 )
 
-openocd_target = dist_env.OpenOCDFlash(
+flash_target = dist_env.FwFlash(
     dist_env["UFBT_STATE_DIR"].File("flash"),
-    dist_env["FW_BIN"],
-    OPENOCD_COMMAND=[
-        "-c",
-        "program ${SOURCE.posix} reset exit 0x08000000",
-    ],
+    dist_env["FW_ELF"],
 )
-dist_env.Alias("firmware_flash", openocd_target)
-dist_env.Alias("flash", openocd_target)
+dist_env.Alias("firmware_flash", flash_target)
+dist_env.Alias("flash", flash_target)
 if env["FORCE"]:
-    env.AlwaysBuild(openocd_target)
+    env.AlwaysBuild(flash_target)
 
 
 firmware_jflash = dist_env.JFlash(
     dist_env["UFBT_STATE_DIR"].File("jflash"),
     dist_env["FW_BIN"],
-    JFLASHADDR="0x20000000",
+    JFLASHADDR="0x08000000",
 )
 dist_env.Alias("firmware_jflash", firmware_jflash)
 dist_env.Alias("jflash", firmware_jflash)
@@ -212,21 +199,6 @@ dist_env.PhonyTarget(
     GDBPYOPTS=debug_other_opts,
 )
 
-
-dist_env.PhonyTarget(
-    "flash_blackmagic",
-    "$GDB $GDBOPTS $SOURCES $GDBFLASH",
-    source=dist_env["FW_ELF"],
-    GDBOPTS="${GDBOPTS_BASE} ${GDBOPTS_BLACKMAGIC}",
-    GDBREMOTE="${BLACKMAGIC_ADDR}",
-    GDBFLASH=[
-        "-ex",
-        "load",
-        "-ex",
-        "quit",
-    ],
-)
-
 flash_usb_full = dist_env.UsbInstall(
     dist_env["UFBT_STATE_DIR"].File("usbinstall"),
     [],
@@ -259,6 +231,7 @@ apps_artifacts = appenv["EXT_APPS"]
 apps_to_build_as_faps = [
     FlipperAppType.PLUGIN,
     FlipperAppType.EXTERNAL,
+    FlipperAppType.MENUEXTERNAL,
 ]
 
 known_extapps = [
@@ -273,7 +246,7 @@ for app in known_extapps:
         continue
 
     app_artifacts = appenv.BuildAppElf(app)
-    app_src_dir = extract_abs_dir(app_artifacts.app._appdir)
+    app_src_dir = resolve_real_dir_node(app_artifacts.app._appdir)
     app_artifacts.installer = [
         appenv.Install(app_src_dir.Dir("dist"), app_artifacts.compact),
         appenv.Install(app_src_dir.Dir("dist").Dir("debug"), app_artifacts.debug),
@@ -302,15 +275,16 @@ Default(install_and_check)
 
 # Compilation database
 
-fwcdb = appenv.CompilationDatabase(
+app_cdb = appenv.CompilationDatabase(
     original_app_dir.Dir(".vscode").File("compile_commands.json")
 )
 
-AlwaysBuild(fwcdb)
-Precious(fwcdb)
-NoClean(fwcdb)
+AlwaysBuild(app_cdb)
+Precious(app_cdb)
+NoClean(app_cdb)
 if len(apps_artifacts):
-    Default(fwcdb)
+    Default(app_cdb)
+Alias("cdb", app_cdb)
 
 
 # launch handler
@@ -332,28 +306,35 @@ def ambiguous_app_call(**kw):
 
 if app_to_launch:
     appenv.AddAppLaunchTarget(app_to_launch, "launch")
+    appenv.AddAppBuildTarget(app_to_launch, "build")
 else:
     dist_env.PhonyTarget("launch", Action(ambiguous_app_call, None))
+    dist_env.PhonyTarget("build", Action(ambiguous_app_call, None))
 
 # cli handler
 
 appenv.PhonyTarget(
     "cli",
-    '${PYTHON3} "${FBT_SCRIPT_DIR}/serial_cli.py"',
+    [["${PYTHON3}", "${FBT_SCRIPT_DIR}/serial_cli.py", "-p", "${FLIP_PORT}"]],
+)
+
+# Update WiFi devboard firmware
+dist_env.PhonyTarget(
+    "devboard_flash", [["${PYTHON3}", "${FBT_SCRIPT_DIR}/wifi_board.py"]]
 )
 
 # Linter
 
 dist_env.PhonyTarget(
     "lint",
-    "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py check ${LINT_SOURCES}",
+    [["${PYTHON3}", "${FBT_SCRIPT_DIR}/lint.py", "check", "${LINT_SOURCES}"]],
     source=original_app_dir.File(".clang-format"),
     LINT_SOURCES=[original_app_dir],
 )
 
 dist_env.PhonyTarget(
     "format",
-    "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py format ${LINT_SOURCES}",
+    [["${PYTHON3}", "${FBT_SCRIPT_DIR}/lint.py", "format", "${LINT_SOURCES}"]],
     source=original_app_dir.File(".clang-format"),
     LINT_SOURCES=[original_app_dir],
 )
@@ -385,7 +366,7 @@ for template_file in project_template_dir.Dir(".vscode").glob("*"):
                 "@UFBT_TOOLCHAIN_OPENOCD@": _path_as_posix(dist_env.WhereIs("openocd")),
                 "@UFBT_APP_DIR@": _path_as_posix(original_app_dir.abspath),
                 "@UFBT_ROOT_DIR@": _path_as_posix(Dir("#").abspath),
-                "@UFBT_DEBUG_DIR@": dist_env["FBT_DEBUG_DIR"],
+                "@UFBT_DEBUG_DIR@": _path_as_posix(dist_env["FBT_DEBUG_DIR"].abspath),
                 "@UFBT_DEBUG_ELF_DIR@": _path_as_posix(
                     dist_env["FBT_FAP_DEBUG_ELF_ROOT"].abspath
                 ),
@@ -401,12 +382,18 @@ for config_file in project_template_dir.glob(".*"):
 
 dist_env.Precious(vscode_dist)
 dist_env.NoClean(vscode_dist)
-dist_env.Alias("vscode_dist", vscode_dist)
+dist_env.Alias("vscode_dist", (vscode_dist, app_cdb))
 
 
 # Creating app from base template
 
 dist_env.SetDefault(FBT_APPID=appenv.subst("$APPID") or "template")
+if fbt_appid := dist_env.subst("$FBT_APPID"):
+    if not FlipperApplication.APP_ID_REGEX.match(fbt_appid):
+        raise UserError(
+            f"Invalid app id '{fbt_appid}'. App id must match {FlipperApplication.APP_ID_REGEX.pattern}"
+        )
+
 app_template_dir = project_template_dir.Dir("app_template")
 app_template_dist = []
 for template_file in app_template_dir.glob("*"):
@@ -460,7 +447,17 @@ if dolphin_src_dir.exists():
     )
     dist_env.PhonyTarget(
         "dolphin_ext",
-        '${PYTHON3} ${FBT_SCRIPT_DIR}/storage.py send "${SOURCE}" /ext/dolphin',
+        [
+            [
+                "${PYTHON3}",
+                "${FBT_SCRIPT_DIR}/storage.py",
+                "-p",
+                "${FLIP_PORT}",
+                "send",
+                "${SOURCE}",
+                "/ext/dolphin",
+            ]
+        ],
         source=ufbt_build_dir.Dir("dolphin"),
     )
 else:
@@ -470,7 +467,12 @@ else:
 
     dist_env.PhonyTarget("dolphin_ext", Action(missing_dolphin_folder, None))
 
+# print(env.Dump())
 dist_env.PhonyTarget(
     "env",
-    "@echo $( ${FBT_SCRIPT_DIR}/toolchain/fbtenv.sh $)",
+    '@echo "FBT_TOOLCHAIN_PATH='
+    + forward_os_env["FBT_TOOLCHAIN_PATH"]
+    + '" source $( "${FBT_SCRIPT_DIR.abspath}/toolchain/fbtenv.sh" $)',
 )
+
+dist_env.PostConfigureUfbtEnvionment()

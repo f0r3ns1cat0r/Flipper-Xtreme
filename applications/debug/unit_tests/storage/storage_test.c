@@ -115,11 +115,75 @@ MU_TEST(storage_file_open_close) {
     furi_record_close(RECORD_STORAGE);
 }
 
+static bool storage_file_read_write_test(File* file, uint8_t* data, size_t test_size) {
+    const char* filename = UNIT_TESTS_PATH("storage_chunk.test");
+
+    // fill with pattern
+    for(size_t i = 0; i < test_size; i++) {
+        data[i] = (i % 113);
+    }
+
+    bool result = false;
+    do {
+        if(!storage_file_open(file, filename, FSAM_WRITE, FSOM_CREATE_ALWAYS)) break;
+        if(test_size != storage_file_write(file, data, test_size)) break;
+        storage_file_close(file);
+
+        // reset data
+        memset(data, 0, test_size);
+
+        if(!storage_file_open(file, filename, FSAM_READ, FSOM_OPEN_EXISTING)) break;
+        if(test_size != storage_file_read(file, data, test_size)) break;
+        storage_file_close(file);
+
+        // check that data is correct
+        for(size_t i = 0; i < test_size; i++) {
+            if(data[i] != (i % 113)) {
+                break;
+            }
+        }
+
+        result = true;
+    } while(false);
+
+    return result;
+}
+
+MU_TEST(storage_file_read_write_64k) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+
+    size_t size_1k = 1024;
+    size_t size_64k = size_1k + size_1k * 63;
+    size_t size_65k = size_64k + size_1k;
+    size_t size_max = size_65k + 8;
+
+    size_t max_ram_block = memmgr_heap_get_max_free_block();
+
+    if(max_ram_block < size_max) {
+        mu_warn("Not enough RAM for >64k block test");
+    } else {
+        uint8_t* data = malloc(size_max);
+        mu_check(storage_file_read_write_test(file, data, size_1k));
+        mu_check(storage_file_read_write_test(file, data, size_64k));
+        mu_check(storage_file_read_write_test(file, data, size_65k));
+        mu_check(storage_file_read_write_test(file, data, size_max));
+        free(data);
+    }
+
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
 MU_TEST_SUITE(storage_file) {
     storage_file_open_lock_setup();
     MU_RUN_TEST(storage_file_open_close);
     MU_RUN_TEST(storage_file_open_lock);
     storage_file_open_lock_teardown();
+}
+
+MU_TEST_SUITE(storage_file_64k) {
+    MU_RUN_TEST(storage_file_read_write_64k);
 }
 
 MU_TEST(storage_dir_open_close) {
@@ -582,6 +646,49 @@ MU_TEST(test_storage_common_migrate) {
     furi_record_close(RECORD_STORAGE);
 }
 
+#define MD5_HASH_SIZE (16)
+#include <lib/toolbox/md5_calc.h>
+
+MU_TEST(test_md5_calc) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+
+    const char* path = UNIT_TESTS_PATH("storage/md5.txt");
+    const char* md5_cstr = "2a456fa43e75088fdde41c93159d62a2";
+    const uint8_t md5[MD5_HASH_SIZE] = {
+        0x2a,
+        0x45,
+        0x6f,
+        0xa4,
+        0x3e,
+        0x75,
+        0x08,
+        0x8f,
+        0xdd,
+        0xe4,
+        0x1c,
+        0x93,
+        0x15,
+        0x9d,
+        0x62,
+        0xa2,
+    };
+
+    uint8_t md5_output[MD5_HASH_SIZE];
+    FuriString* md5_output_str = furi_string_alloc();
+    memset(md5_output, 0, MD5_HASH_SIZE);
+
+    mu_check(md5_calc_file(file, path, md5_output, NULL));
+    mu_check(md5_string_calc_file(file, path, md5_output_str, NULL));
+
+    mu_assert_mem_eq(md5, md5_output, MD5_HASH_SIZE);
+    mu_assert_string_eq(md5_cstr, furi_string_get_cstr(md5_output_str));
+
+    storage_file_free(file);
+    furi_string_free(md5_output_str);
+    furi_record_close(RECORD_STORAGE);
+}
+
 MU_TEST_SUITE(test_data_path) {
     MU_RUN_TEST(test_storage_data_path);
     MU_RUN_TEST(test_storage_data_path_apps);
@@ -591,11 +698,17 @@ MU_TEST_SUITE(test_storage_common) {
     MU_RUN_TEST(test_storage_common_migrate);
 }
 
+MU_TEST_SUITE(test_md5_calc_suite) {
+    MU_RUN_TEST(test_md5_calc);
+}
+
 int run_minunit_test_storage() {
     MU_RUN_SUITE(storage_file);
+    MU_RUN_SUITE(storage_file_64k);
     MU_RUN_SUITE(storage_dir);
     MU_RUN_SUITE(storage_rename);
     MU_RUN_SUITE(test_data_path);
     MU_RUN_SUITE(test_storage_common);
+    MU_RUN_SUITE(test_md5_calc_suite);
     return MU_EXIT_CODE;
 }

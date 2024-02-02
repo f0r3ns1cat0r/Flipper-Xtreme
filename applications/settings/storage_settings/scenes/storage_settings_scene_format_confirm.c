@@ -14,7 +14,7 @@ void storage_settings_scene_format_confirm_on_enter(void* context) {
     FS_Error sd_status = storage_sd_status(app->fs_api);
 
     if(sd_status == FSE_NOT_READY) {
-        dialog_ex_set_icon(dialog_ex, 72, 17, &I_DolphinCommon_56x48);
+        dialog_ex_set_icon(dialog_ex, 83, 22, &I_WarningDolphinFlip_45x42);
         dialog_ex_set_header(dialog_ex, "SD Card Not Mounted", 64, 3, AlignCenter, AlignTop);
         dialog_ex_set_text(
             dialog_ex, "Try to reinsert\nor format SD\ncard.", 3, 19, AlignLeft, AlignTop);
@@ -44,6 +44,7 @@ bool storage_settings_scene_format_confirm_on_event(void* context, SceneManagerE
             consumed = scene_manager_previous_scene(app->scene_manager);
             break;
         case DialogExResultRight:
+            scene_manager_set_scene_state(app->scene_manager, StorageSettingsFormatting, false);
             scene_manager_next_scene(app->scene_manager, StorageSettingsFormatting);
             consumed = true;
             break;

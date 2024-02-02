@@ -1,4 +1,6 @@
 #include "thread.h"
+#include "thread_i.h"
+#include "timer.h"
 #include "kernel.h"
 #include "memmgr.h"
 #include "memmgr_heap.h"
@@ -7,55 +9,24 @@
 #include "mutex.h"
 #include "string.h"
 
-#include <task.h>
+#include <timers.h>
 #include "log.h"
 #include <furi_hal_rtc.h>
-#include <furi_hal_console.h>
+
+#include <FreeRTOS.h>
+#include <task.h>
 
 #define TAG "FuriThread"
 
 #define THREAD_NOTIFY_INDEX 1 // Index 0 is used for stream buffers
-
-typedef struct FuriThreadStdout FuriThreadStdout;
-
-struct FuriThreadStdout {
-    FuriThreadStdoutWriteCallback write_callback;
-    FuriString* buffer;
-};
-
-struct FuriThread {
-    FuriThreadState state;
-    int32_t ret;
-
-    FuriThreadCallback callback;
-    void* context;
-
-    FuriThreadStateCallback state_callback;
-    void* state_context;
-
-    char* name;
-    char* appid;
-
-    FuriThreadPriority priority;
-
-    TaskHandle_t task_handle;
-    size_t heap_size;
-
-    FuriThreadStdout output;
-
-    // Keep all non-alignable byte types in one place,
-    // this ensures that the size of this structure is minimal
-    bool is_service;
-    bool heap_trace_enabled;
-
-    configSTACK_DEPTH_TYPE stack_size;
-};
 
 static size_t __furi_thread_stdout_write(FuriThread* thread, const char* data, size_t size);
 static int32_t __furi_thread_stdout_flush(FuriThread* thread);
 
 /** Catch threads that are trying to exit wrong way */
 __attribute__((__noreturn__)) void furi_thread_catch() { //-V1082
+    // If you're here it means you're probably doing something wrong
+    // with critical sections or with scheduler state
     asm volatile("nop"); // extra magic
     furi_crash("You are doing it wrong"); //-V779
     __builtin_unreachable();
@@ -90,10 +61,10 @@ static void furi_thread_body(void* context) {
     if(thread->heap_trace_enabled == true) {
         furi_delay_ms(33);
         thread->heap_size = memmgr_heap_get_thread_memory((FuriThreadId)task_handle);
-        furi_log_print_format( //-V576
+        furi_log_print_format(
             thread->heap_size ? FuriLogLevelError : FuriLogLevelInfo,
             TAG,
-            "%s allocation balance: %u",
+            "%s allocation balance: %zu",
             thread->name ? thread->name : "Thread",
             thread->heap_size);
         memmgr_heap_disable_thread_trace((FuriThreadId)task_handle);
@@ -543,6 +514,11 @@ const char* furi_thread_get_appid(FuriThreadId thread_id) {
         FuriThread* thread = (FuriThread*)pvTaskGetThreadLocalStoragePointer(hTask, 0);
         if(thread) {
             appid = thread->appid;
+        } else if(hTask == xTimerGetTimerDaemonTaskHandle()) {
+            const char* timer = furi_timer_get_current_name();
+            if(timer) {
+                appid = timer;
+            }
         }
     }
 
@@ -566,7 +542,7 @@ static size_t __furi_thread_stdout_write(FuriThread* thread, const char* data, s
     if(thread->output.write_callback != NULL) {
         thread->output.write_callback(data, size);
     } else {
-        furi_hal_console_tx((const uint8_t*)data, size);
+        furi_log_tx((const uint8_t*)data, size);
     }
     return size;
 }

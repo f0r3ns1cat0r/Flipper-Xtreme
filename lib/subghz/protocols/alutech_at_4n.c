@@ -5,7 +5,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 
-#include "../blocks/custom_btn.h"
+#include "../blocks/custom_btn_i.h"
 
 #define TAG "SubGhzProtocoAlutech_at_4n"
 
@@ -274,7 +274,7 @@ static bool subghz_protocol_alutech_at_4n_gen_data(
     }
 
     if(instance->generic.cnt < 0xFFFF) {
-        if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) >= 0xFFFF) {
+        if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) > 0xFFFF) {
             instance->generic.cnt = 0;
         } else {
             instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
@@ -651,10 +651,10 @@ static void subghz_protocol_alutech_at_4n_remote_controller(
     subghz_custom_btn_set_max(4);
 }
 
-uint8_t subghz_protocol_decoder_alutech_at_4n_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_alutech_at_4n_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderAlutech_at_4n* instance = context;
-    return (uint8_t)instance->crc;
+    return instance->crc;
 }
 
 SubGhzProtocolStatus subghz_protocol_decoder_alutech_at_4n_serialize(

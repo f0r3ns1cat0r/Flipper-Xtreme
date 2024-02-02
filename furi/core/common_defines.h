@@ -2,8 +2,6 @@
 
 #include "core_defines.h"
 #include <stdbool.h>
-#include <FreeRTOS.h>
-#include <task.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,6 +17,10 @@ extern "C" {
 #define FURI_WEAK __attribute__((weak))
 #endif
 
+#ifndef FURI_PACKED
+#define FURI_PACKED __attribute__((packed))
+#endif
+
 #ifndef FURI_IS_IRQ_MASKED
 #define FURI_IS_IRQ_MASKED() (__get_PRIMASK() != 0U)
 #endif
@@ -31,29 +33,26 @@ extern "C" {
 #define FURI_IS_ISR() (FURI_IS_IRQ_MODE() || FURI_IS_IRQ_MASKED())
 #endif
 
+typedef struct {
+    uint32_t isrm;
+    bool from_isr;
+    bool kernel_running;
+} __FuriCriticalInfo;
+
+__FuriCriticalInfo __furi_critical_enter(void);
+
+void __furi_critical_exit(__FuriCriticalInfo info);
+
 #ifndef FURI_CRITICAL_ENTER
-#define FURI_CRITICAL_ENTER()                                                    \
-    uint32_t __isrm = 0;                                                         \
-    bool __from_isr = FURI_IS_ISR();                                             \
-    bool __kernel_running = (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING); \
-    if(__from_isr) {                                                             \
-        __isrm = taskENTER_CRITICAL_FROM_ISR();                                  \
-    } else if(__kernel_running) {                                                \
-        taskENTER_CRITICAL();                                                    \
-    } else {                                                                     \
-        __disable_irq();                                                         \
-    }
+#define FURI_CRITICAL_ENTER() __FuriCriticalInfo __furi_critical_info = __furi_critical_enter();
 #endif
 
 #ifndef FURI_CRITICAL_EXIT
-#define FURI_CRITICAL_EXIT()                \
-    if(__from_isr) {                        \
-        taskEXIT_CRITICAL_FROM_ISR(__isrm); \
-    } else if(__kernel_running) {           \
-        taskEXIT_CRITICAL();                \
-    } else {                                \
-        __enable_irq();                     \
-    }
+#define FURI_CRITICAL_EXIT() __furi_critical_exit(__furi_critical_info);
+#endif
+
+#ifndef FURI_CHECK_RETURN
+#define FURI_CHECK_RETURN __attribute__((__warn_unused_result__))
 #endif
 
 #ifdef __cplusplus

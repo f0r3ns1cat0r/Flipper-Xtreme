@@ -1,5 +1,6 @@
 #pragma once
 #include "../registry.h"
+#include "../subghz_protocol_registry.h"
 
 #include "princeton.h"
 #include "keeloq.h"
@@ -32,6 +33,7 @@
 #include "bett.h"
 #include "doitrand.h"
 #include "phoenix_v2.h"
+#include "honeywell.h"
 #include "honeywell_wdb.h"
 #include "magellan.h"
 #include "intertechno_v3.h"
@@ -42,14 +44,28 @@
 #include "dooya.h"
 #include "alutech_at_4n.h"
 #include "kinggates_stylo_4k.h"
+#include "infactory.h"
+#include "thermopro_tx4.h"
+#include "nexus_th.h"
+#include "gt_wt_02.h"
+#include "gt_wt_03.h"
+#include "acurite_606tx.h"
+#include "acurite_609txc.h"
+#include "acurite_986.h"
+#include "lacrosse_tx.h"
+#include "lacrosse_tx141thbv2.h"
+#include "oregon2.h"
+#include "oregon3.h"
+#include "acurite_592txr.h"
+#include "ambient_weather.h"
+#include "auriol_hg0601a.h"
+#include "oregon_v1.h"
+#include "tx_8300.h"
+#include "wendox_w6726.h"
+#include "auriol_ahfl.h"
+#include "kedsum_th.h"
+#include "pocsag.h"
+#include "schrader_gg4.h"
 #include "bin_raw.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern const SubGhzProtocolRegistry subghz_protocol_registry;
-
-#ifdef __cplusplus
-}
-#endif
+#include "mastercode.h"
+#include "x10.h"

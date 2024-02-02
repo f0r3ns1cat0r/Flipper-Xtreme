@@ -12,7 +12,6 @@
 #include <input/input.h>
 #include <stdint.h>
 #include <core/dangerous_defines.h>
-#include <loader/loader.h>
 
 #define ACTIVE_SHIFT 2
 
@@ -24,7 +23,7 @@ typedef struct {
     uint8_t active_bubbles;
     uint8_t passive_bubbles;
     uint8_t active_shift;
-    TickType_t active_ended_at;
+    uint32_t active_ended_at;
     Icon* freeze_frame;
 } BubbleAnimationViewModel;
 
@@ -129,15 +128,11 @@ static bool bubble_animation_input_callback(InputEvent* event, void* context) {
 
     if(event->key == InputKeyRight) {
         /* Right button reserved for animation activation, so consume */
-        consumed = true;
         if(event->type == InputTypeShort) {
             if(animation_view->interact_callback) {
+                consumed = true;
                 animation_view->interact_callback(animation_view->interact_callback_context);
             }
-        } else if(event->type == InputTypeLong) {
-            Loader* loader = furi_record_open(RECORD_LOADER);
-            loader_start(loader, "Power", "about_battery");
-            furi_record_close(RECORD_LOADER);
         }
     }
 
@@ -159,7 +154,7 @@ static void bubble_animation_activate(BubbleAnimationView* view, bool force) {
     if(model->current != NULL) {
         if(!force) {
             if((model->active_ended_at + model->current->active_cooldown * 1000) >
-               xTaskGetTickCount()) {
+               furi_get_tick()) {
                 activate = false;
             } else if(model->active_shift) {
                 activate = false;
@@ -220,7 +215,7 @@ static void bubble_animation_next_frame(BubbleAnimationViewModel* model) {
             model->active_cycle = 0;
             model->current_frame = 0;
             model->current_bubble = bubble_animation_pick_bubble(model, false);
-            model->active_ended_at = xTaskGetTickCount();
+            model->active_ended_at = furi_get_tick();
         }
 
         if(model->current_bubble) {
@@ -360,7 +355,7 @@ void bubble_animation_view_set_animation(
     furi_assert(model);
     model->current = new_animation;
 
-    model->active_ended_at = xTaskGetTickCount() - (model->current->active_cooldown * 1000);
+    model->active_ended_at = furi_get_tick() - (model->current->active_cooldown * 1000);
     model->active_bubbles = 0;
     model->passive_bubbles = 0;
     for(int i = 0; i < new_animation->frame_bubble_sequences_count; ++i) {

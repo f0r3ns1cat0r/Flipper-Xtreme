@@ -24,13 +24,13 @@ static FS_Error storage_ext_parse_error(SDError error);
 
 /******************* Core Functions *******************/
 
-static bool sd_mount_card(StorageData* storage, bool notify) {
+static bool sd_mount_card_internal(StorageData* storage, bool notify) {
     bool result = false;
-    uint8_t counter = sd_max_mount_retry_count();
+    uint8_t counter = furi_hal_sd_max_mount_retry_count();
     uint8_t bsp_result;
     SDData* sd_data = storage->data;
 
-    while(result == false && counter > 0 && hal_sd_detect()) {
+    while(result == false && counter > 0 && furi_hal_sd_is_present()) {
         if(notify) {
             NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
             sd_notify_wait(notification);
@@ -39,9 +39,9 @@ static bool sd_mount_card(StorageData* storage, bool notify) {
 
         if((counter % 2) == 0) {
             // power reset sd card
-            bsp_result = sd_init(true);
+            bsp_result = furi_hal_sd_init(true);
         } else {
-            bsp_result = sd_init(false);
+            bsp_result = furi_hal_sd_init(false);
         }
 
         if(bsp_result) {
@@ -100,10 +100,36 @@ FS_Error sd_unmount_card(StorageData* storage) {
     storage->status = StorageStatusNotReady;
     error = FR_DISK_ERR;
 
-    // TODO do i need to close the files?
+    // TODO FL-3522: do i need to close the files?
     f_mount(0, sd_data->path, 0);
 
     return storage_ext_parse_error(error);
+}
+
+FS_Error sd_mount_card(StorageData* storage, bool notify) {
+    sd_mount_card_internal(storage, notify);
+    FS_Error error;
+
+    if(storage->status != StorageStatusOK) {
+        FURI_LOG_E(TAG, "sd init error: %s", storage_data_status_text(storage));
+        if(notify) {
+            NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
+            sd_notify_error(notification);
+            furi_record_close(RECORD_NOTIFICATION);
+        }
+        error = FSE_INTERNAL;
+    } else {
+        FURI_LOG_I(TAG, "card mounted");
+        if(notify) {
+            NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
+            sd_notify_success(notification);
+            furi_record_close(RECORD_NOTIFICATION);
+        }
+
+        error = FSE_OK;
+    }
+
+    return error;
 }
 
 FS_Error sd_format_card(StorageData* storage) {
@@ -199,18 +225,18 @@ FS_Error sd_card_info(StorageData* storage, SDInfo* sd_info) {
 #endif
     }
 
-    SD_CID cid;
-    SdSpiStatus status = sd_get_cid(&cid);
+    FuriHalSdInfo info;
+    FuriStatus status = furi_hal_sd_info(&info);
 
-    if(status == SdSpiStatusOK) {
-        sd_info->manufacturer_id = cid.ManufacturerID;
-        memcpy(sd_info->oem_id, cid.OEM_AppliID, sizeof(cid.OEM_AppliID));
-        memcpy(sd_info->product_name, cid.ProdName, sizeof(cid.ProdName));
-        sd_info->product_revision_major = cid.ProdRev >> 4;
-        sd_info->product_revision_minor = cid.ProdRev & 0x0F;
-        sd_info->product_serial_number = cid.ProdSN;
-        sd_info->manufacturing_year = 2000 + cid.ManufactYear;
-        sd_info->manufacturing_month = cid.ManufactMonth;
+    if(status == FuriStatusOk) {
+        sd_info->manufacturer_id = info.manufacturer_id;
+        memcpy(sd_info->oem_id, info.oem_id, sizeof(info.oem_id));
+        memcpy(sd_info->product_name, info.product_name, sizeof(info.product_name));
+        sd_info->product_revision_major = info.product_revision_major;
+        sd_info->product_revision_minor = info.product_revision_minor;
+        sd_info->product_serial_number = info.product_serial_number;
+        sd_info->manufacturing_year = info.manufacturing_year;
+        sd_info->manufacturing_month = info.manufacturing_month;
     }
 
     return storage_ext_parse_error(error);
@@ -220,36 +246,19 @@ static void storage_ext_tick_internal(StorageData* storage, bool notify) {
     SDData* sd_data = storage->data;
 
     if(sd_data->sd_was_present) {
-        if(hal_sd_detect()) {
+        if(furi_hal_sd_is_present()) {
             FURI_LOG_I(TAG, "card detected");
+            sd_data->sd_was_present = false;
             sd_mount_card(storage, notify);
 
-            if(storage->status != StorageStatusOK) {
-                FURI_LOG_E(TAG, "sd init error: %s", storage_data_status_text(storage));
-                if(notify) {
-                    NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
-                    sd_notify_error(notification);
-                    furi_record_close(RECORD_NOTIFICATION);
-                }
-            } else {
-                FURI_LOG_I(TAG, "card mounted");
-                if(notify) {
-                    NotificationApp* notification = furi_record_open(RECORD_NOTIFICATION);
-                    sd_notify_success(notification);
-                    furi_record_close(RECORD_NOTIFICATION);
-                }
-            }
-
-            sd_data->sd_was_present = false;
-
-            if(!hal_sd_detect()) {
+            if(!furi_hal_sd_is_present()) {
                 FURI_LOG_I(TAG, "card removed while mounting");
                 sd_unmount_card(storage);
                 sd_data->sd_was_present = true;
             }
         }
     } else {
-        if(!hal_sd_detect()) {
+        if(!furi_hal_sd_is_present()) {
             FURI_LOG_I(TAG, "card removed");
             sd_data->sd_was_present = true;
 
@@ -353,20 +362,20 @@ static uint16_t
 
 static uint16_t
     storage_ext_file_write(void* ctx, File* file, const void* buff, uint16_t const bytes_to_write) {
+    uint16_t bytes_written = 0;
 #ifdef FURI_RAM_EXEC
     UNUSED(ctx);
     UNUSED(file);
     UNUSED(buff);
     UNUSED(bytes_to_write);
-    return FSE_NOT_READY;
+    file->error_id = FSE_NOT_READY;
 #else
     StorageData* storage = ctx;
     SDFile* file_data = storage_get_storage_file_data(file, storage);
-    uint16_t bytes_written = 0;
     file->internal_error_id = f_write(file_data, buff, bytes_to_write, &bytes_written);
     file->error_id = storage_ext_parse_error(file->internal_error_id);
-    return bytes_written;
 #endif
+    return bytes_written;
 }
 
 static bool
@@ -396,34 +405,50 @@ static uint64_t storage_ext_file_tell(void* ctx, File* file) {
     return position;
 }
 
+static bool storage_ext_file_expand(void* ctx, File* file, const uint64_t size) {
+#ifdef FURI_RAM_EXEC
+    UNUSED(ctx);
+    UNUSED(file);
+    UNUSED(size);
+    file->error_id = FSE_NOT_READY;
+#else
+    StorageData* storage = ctx;
+    SDFile* file_data = storage_get_storage_file_data(file, storage);
+
+    file->internal_error_id = f_expand(file_data, size, 1);
+    file->error_id = storage_ext_parse_error(file->internal_error_id);
+#endif
+    return (file->error_id == FSE_OK);
+}
+
 static bool storage_ext_file_truncate(void* ctx, File* file) {
 #ifdef FURI_RAM_EXEC
     UNUSED(ctx);
     UNUSED(file);
-    return FSE_NOT_READY;
+    file->error_id = FSE_NOT_READY;
 #else
     StorageData* storage = ctx;
     SDFile* file_data = storage_get_storage_file_data(file, storage);
 
     file->internal_error_id = f_truncate(file_data);
     file->error_id = storage_ext_parse_error(file->internal_error_id);
-    return (file->error_id == FSE_OK);
 #endif
+    return (file->error_id == FSE_OK);
 }
 
 static bool storage_ext_file_sync(void* ctx, File* file) {
 #ifdef FURI_RAM_EXEC
     UNUSED(ctx);
     UNUSED(file);
-    return FSE_NOT_READY;
+    file->error_id = FSE_NOT_READY;
 #else
     StorageData* storage = ctx;
     SDFile* file_data = storage_get_storage_file_data(file, storage);
 
     file->internal_error_id = f_sync(file_data);
     file->error_id = storage_ext_parse_error(file->internal_error_id);
-    return (file->error_id == FSE_OK);
 #endif
+    return (file->error_id == FSE_OK);
 }
 
 static uint64_t storage_ext_file_size(void* ctx, File* file) {
@@ -599,6 +624,16 @@ static FS_Error storage_ext_common_fs_info(
 #endif
 }
 
+static bool storage_ext_common_equivalent_path(const char* path1, const char* path2) {
+#ifdef FURI_RAM_EXEC
+    UNUSED(path1);
+    UNUSED(path2);
+    return false;
+#else
+    return strcasecmp(path1, path2) == 0;
+#endif
+}
+
 /******************* Init Storage *******************/
 static const FS_Api fs_api = {
     .file =
@@ -609,6 +644,7 @@ static const FS_Api fs_api = {
             .write = storage_ext_file_write,
             .seek = storage_ext_file_seek,
             .tell = storage_ext_file_tell,
+            .expand = storage_ext_file_expand,
             .truncate = storage_ext_file_truncate,
             .size = storage_ext_file_size,
             .sync = storage_ext_file_sync,
@@ -628,6 +664,7 @@ static const FS_Api fs_api = {
             .remove = storage_ext_common_remove,
             .rename = storage_ext_common_rename,
             .fs_info = storage_ext_common_fs_info,
+            .equivalent_path = storage_ext_common_equivalent_path,
         },
 };
 
@@ -643,7 +680,7 @@ void storage_ext_init(StorageData* storage) {
     storage->api.tick = storage_ext_tick;
     storage->fs_api = &fs_api;
 
-    hal_sd_detect_init();
+    furi_hal_sd_presence_init();
 
     // do not notify on first launch, notifications app is waiting for our thread to read settings
     storage_ext_tick_internal(storage, false);

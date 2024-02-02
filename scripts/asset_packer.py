@@ -85,6 +85,20 @@ def pack_icon_static(src: pathlib.Path, dst: pathlib.Path):
     dst.with_suffix(".bmx").write_bytes(convert_bmx(src))
 
 
+def pack_font(src: pathlib.Path, dst: pathlib.Path):
+    code = src.read_bytes().split(b' U8G2_FONT_SECTION("')[1].split(b'") =')[1].strip()
+    font = b""
+    for line in code.splitlines():
+        if line.count(b'"') == 2:
+            font += (
+                line[line.find(b'"') + 1 : line.rfind(b'"')]
+                .decode("unicode_escape")
+                .encode("latin_1")
+            )
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.with_suffix(".u8f").write_bytes(font)
+
+
 def pack(
     input: "str | pathlib.Path", output: "str | pathlib.Path", logger: typing.Callable
 ):
@@ -145,18 +159,25 @@ def pack(
                             icon, packed / "Icons" / icons.name / icon.name
                         )
 
+        if (source / "Fonts").is_dir():
+            for font in (source / "Fonts").iterdir():
+                if not font.is_file():
+                    continue
+                logger(f"Compile: font for pack '{source.name}': {font.name}")
+                pack_font(font, packed / "Fonts" / font.name)
+
 
 if __name__ == "__main__":
     input(
         "This will look through all the subfolders next to this file and try to pack them\n"
-        "The resulting asset packs will be saved to 'dolphin_custom' in this folder\n"
+        "The resulting asset packs will be saved to 'asset_packs' in this folder\n"
         "Press [Enter] if you wish to continue"
     )
     print()
     here = pathlib.Path(__file__).absolute().parent
     start = time.perf_counter()
 
-    pack(here, here / "dolphin_custom", logger=print)
+    pack(here, here / "asset_packs", logger=print)
 
     end = time.perf_counter()
     input(f"\nFinished in {round(end - start, 2)}s\n" "Press [Enter] to exit")

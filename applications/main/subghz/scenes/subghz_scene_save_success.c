@@ -11,8 +11,8 @@ void subghz_scene_save_success_on_enter(void* context) {
 
     // Setup view
     Popup* popup = subghz->popup;
-    popup_set_icon(popup, 32, 5, &I_DolphinNice_96x59);
-    popup_set_header(popup, "Saved!", 13, 22, AlignLeft, AlignBottom);
+    popup_set_icon(popup, 36, 5, &I_DolphinSaved_92x58);
+    popup_set_header(popup, "Saved", 15, 19, AlignLeft, AlignBottom);
     popup_set_timeout(popup, 1500);
     popup_set_context(popup, subghz);
     popup_set_callback(popup, subghz_scene_save_success_popup_callback);
@@ -42,7 +42,7 @@ bool subghz_scene_save_success_on_event(void* context, SceneManagerEvent event) 
                     subghz->scene_manager, SubGhzSceneDecodeRAW, SubGhzDecodeRawStateStart);
 
                 subghz->idx_menu_chosen = 0;
-                subghz_txrx_set_rx_calback(subghz->txrx, NULL, subghz);
+                subghz_txrx_set_rx_callback(subghz->txrx, NULL, subghz);
 
                 if(subghz_file_encoder_worker_is_running(subghz->decode_raw_file_worker_encoder)) {
                     subghz_file_encoder_worker_stop(subghz->decode_raw_file_worker_encoder);

@@ -1,4 +1,4 @@
-#include <xtreme.h>
+#include <xtreme/xtreme.h>
 #include "gui_i.h"
 #include <assets_icons.h>
 #include <storage/storage.h>
@@ -20,11 +20,12 @@ ViewPort* gui_view_port_find_enabled(ViewPortArray_t array) {
     return NULL;
 }
 
-uint8_t gui_get_count_of_enabled_view_port_in_layer(Gui* gui, GuiLayer layer) {
+size_t gui_active_view_port_count(Gui* gui, GuiLayer layer) {
     furi_assert(gui);
     furi_check(layer < GuiLayerMAX);
-    uint8_t ret = 0;
+    size_t ret = 0;
 
+    gui_lock(gui);
     ViewPortArray_it_t it;
     ViewPortArray_it_last(it, gui->layers[layer]);
     while(!ViewPortArray_end_p(it)) {
@@ -34,6 +35,8 @@ uint8_t gui_get_count_of_enabled_view_port_in_layer(Gui* gui, GuiLayer layer) {
         }
         ViewPortArray_previous(it);
     }
+    gui_unlock(gui);
+
     return ret;
 }
 
@@ -50,6 +53,16 @@ void gui_input_events_callback(const void* value, void* ctx) {
 
     furi_message_queue_put(gui->input_queue, value, FuriWaitForever);
     furi_thread_flags_set(gui->thread_id, GUI_THREAD_FLAG_INPUT);
+}
+
+void gui_ascii_events_callback(const void* value, void* ctx) {
+    furi_assert(value);
+    furi_assert(ctx);
+
+    Gui* gui = ctx;
+
+    furi_message_queue_put(gui->ascii_queue, value, FuriWaitForever);
+    furi_thread_flags_set(gui->thread_id, GUI_THREAD_FLAG_ASCII);
 }
 
 // Only Fullscreen supports vertical display for now
@@ -81,12 +94,10 @@ static void gui_redraw_status_bar(Gui* gui, bool need_attention) {
     canvas_frame_set(
         gui->canvas, GUI_STATUS_BAR_X, GUI_STATUS_BAR_Y, GUI_DISPLAY_WIDTH, GUI_STATUS_BAR_HEIGHT);
 
-    XtremeSettings* xtreme_settings = XTREME_SETTINGS();
-
     /* for support black theme - paint white area and
      * draw icon with transparent white color
      */
-    if(xtreme_settings->bar_background) {
+    if(xtreme_settings.bar_background) {
         canvas_set_color(gui->canvas, ColorWhite);
         canvas_draw_box(gui->canvas, 1, 1, 9, 7);
         canvas_draw_box(gui->canvas, 7, 3, 58, 6);
@@ -100,80 +111,72 @@ static void gui_redraw_status_bar(Gui* gui, bool need_attention) {
     }
     canvas_set_bitmap_mode(gui->canvas, 0);
 
-    uint8_t x;
-
     // Right side
-    if(xtreme_settings->battery_icon != BatteryIconOff) {
-        x = GUI_DISPLAY_WIDTH - 1;
-        ViewPortArray_it(it, gui->layers[GuiLayerStatusBarRight]);
-        while(!ViewPortArray_end_p(it) && right_used < GUI_STATUS_BAR_WIDTH) {
-            ViewPort* view_port = *ViewPortArray_ref(it);
-            if(view_port_is_enabled(view_port)) {
-                width = view_port_get_width(view_port);
-                if(!width) width = 8;
-                // Recalculate next position
-                right_used += (width + 2);
-                x -= (width + 2);
-                // Prepare work area background
-                canvas_frame_set(
-                    gui->canvas,
-                    x - 1,
-                    GUI_STATUS_BAR_Y + 1,
-                    width + 2,
-                    GUI_STATUS_BAR_WORKAREA_HEIGHT + 2);
-                // Hide battery background
-                if(xtreme_settings->bar_borders) {
-                    canvas_set_color(gui->canvas, ColorWhite);
-                    canvas_draw_box(
-                        gui->canvas,
-                        -1,
-                        0,
-                        canvas_width(gui->canvas) + 1,
-                        canvas_height(gui->canvas));
-                }
-                canvas_set_color(gui->canvas, ColorBlack);
-                // ViewPort draw
-                canvas_frame_set(
-                    gui->canvas,
-                    x - xtreme_settings->bar_borders,
-                    GUI_STATUS_BAR_Y + 2,
-                    width,
-                    GUI_STATUS_BAR_WORKAREA_HEIGHT);
-                view_port_draw(view_port, gui->canvas);
-            }
-            ViewPortArray_next(it);
-        }
-        // Draw frame around icons on the right
-        if(right_used) {
+    uint8_t x = GUI_DISPLAY_WIDTH - 1;
+    ViewPortArray_it(it, gui->layers[GuiLayerStatusBarRight]);
+    while(!ViewPortArray_end_p(it) && right_used < GUI_STATUS_BAR_WIDTH) {
+        ViewPort* view_port = *ViewPortArray_ref(it);
+        if(view_port_is_enabled(view_port)) {
+            width = view_port_get_width(view_port);
+            if(!width) width = 8;
+            // Recalculate next position
+            right_used += (width + 2);
+            x -= (width + 2);
+            // Prepare work area background
             canvas_frame_set(
                 gui->canvas,
-                GUI_DISPLAY_WIDTH - 4 - right_used,
-                GUI_STATUS_BAR_Y,
-                right_used + 4,
-                GUI_STATUS_BAR_HEIGHT);
-            // Disable battery border
-            if(xtreme_settings->bar_borders) {
-                canvas_set_color(gui->canvas, ColorBlack);
-                canvas_draw_rframe(
-                    gui->canvas, 0, 0, canvas_width(gui->canvas), canvas_height(gui->canvas), 1);
-                canvas_draw_line(
-                    gui->canvas,
-                    canvas_width(gui->canvas) - 2,
-                    1,
-                    canvas_width(gui->canvas) - 2,
-                    canvas_height(gui->canvas) - 2);
-                canvas_draw_line(
-                    gui->canvas,
-                    1,
-                    canvas_height(gui->canvas) - 2,
-                    canvas_width(gui->canvas) - 2,
-                    canvas_height(gui->canvas) - 2);
+                x - 1,
+                GUI_STATUS_BAR_Y + 1,
+                width + 2,
+                GUI_STATUS_BAR_WORKAREA_HEIGHT + 2);
+            // Hide battery background
+            if(xtreme_settings.bar_borders) {
+                canvas_set_color(gui->canvas, ColorWhite);
+                canvas_draw_box(
+                    gui->canvas, -1, 0, canvas_width(gui->canvas) + 1, canvas_height(gui->canvas));
             }
+            canvas_set_color(gui->canvas, ColorBlack);
+            // ViewPort draw
+            canvas_frame_set(
+                gui->canvas,
+                x - xtreme_settings.bar_borders,
+                GUI_STATUS_BAR_Y + 2,
+                width,
+                GUI_STATUS_BAR_WORKAREA_HEIGHT);
+            view_port_draw(view_port, gui->canvas);
+        }
+        ViewPortArray_next(it);
+    }
+    // Draw frame around icons on the right
+    if(right_used) {
+        canvas_frame_set(
+            gui->canvas,
+            GUI_DISPLAY_WIDTH - 4 - right_used,
+            GUI_STATUS_BAR_Y,
+            right_used + 4,
+            GUI_STATUS_BAR_HEIGHT);
+        // Disable battery border
+        if(xtreme_settings.bar_borders) {
+            canvas_set_color(gui->canvas, ColorBlack);
+            canvas_draw_rframe(
+                gui->canvas, 0, 0, canvas_width(gui->canvas), canvas_height(gui->canvas), 1);
+            canvas_draw_line(
+                gui->canvas,
+                canvas_width(gui->canvas) - 2,
+                1,
+                canvas_width(gui->canvas) - 2,
+                canvas_height(gui->canvas) - 2);
+            canvas_draw_line(
+                gui->canvas,
+                1,
+                canvas_height(gui->canvas) - 2,
+                canvas_width(gui->canvas) - 2,
+                canvas_height(gui->canvas) - 2);
         }
     }
 
     // Left side
-    if(xtreme_settings->status_icons) {
+    if(xtreme_settings.status_icons) {
         x = 2;
         ViewPortArray_it(it, gui->layers[GuiLayerStatusBarLeft]);
         while(!ViewPortArray_end_p(it) && (right_used + left_used) < GUI_STATUS_BAR_WIDTH) {
@@ -188,7 +191,7 @@ static void gui_redraw_status_bar(Gui* gui, bool need_attention) {
                     GUI_STATUS_BAR_Y + 1,
                     width + 2,
                     GUI_STATUS_BAR_WORKAREA_HEIGHT + 2);
-                if(xtreme_settings->bar_borders) {
+                if(xtreme_settings.bar_borders) {
                     canvas_set_color(gui->canvas, ColorWhite);
                     canvas_draw_box(
                         gui->canvas, 0, 0, canvas_width(gui->canvas), canvas_height(gui->canvas));
@@ -214,7 +217,7 @@ static void gui_redraw_status_bar(Gui* gui, bool need_attention) {
                 GUI_STATUS_BAR_Y + 1,
                 width + 2,
                 GUI_STATUS_BAR_WORKAREA_HEIGHT + 2);
-            if(xtreme_settings->bar_borders) {
+            if(xtreme_settings.bar_borders) {
                 canvas_set_color(gui->canvas, ColorWhite);
                 canvas_draw_box(
                     gui->canvas, 0, 0, canvas_width(gui->canvas), canvas_height(gui->canvas));
@@ -231,7 +234,7 @@ static void gui_redraw_status_bar(Gui* gui, bool need_attention) {
         // Draw frame around icons on the left
         if(left_used) {
             canvas_frame_set(gui->canvas, 0, 0, left_used + 3, GUI_STATUS_BAR_HEIGHT);
-            if(xtreme_settings->bar_borders) {
+            if(xtreme_settings.bar_borders) {
                 canvas_draw_rframe(
                     gui->canvas, 0, 0, canvas_width(gui->canvas), canvas_height(gui->canvas), 1);
                 canvas_draw_line(
@@ -288,7 +291,7 @@ static void gui_redraw(Gui* gui) {
             bool need_attention =
                 (gui_view_port_find_enabled(gui->layers[GuiLayerWindow]) != 0 ||
                  gui_view_port_find_enabled(gui->layers[GuiLayerFullscreen]) != 0);
-            if(XTREME_SETTINGS()->lockscreen_statusbar) {
+            if(xtreme_settings.lockscreen_statusbar) {
                 gui_redraw_status_bar(gui, need_attention);
             }
         } else {
@@ -382,6 +385,35 @@ static void gui_input(Gui* gui, InputEvent* input_event) {
     gui_unlock(gui);
 }
 
+static void gui_ascii(Gui* gui, AsciiEvent* ascii_event) {
+    furi_assert(gui);
+    furi_assert(ascii_event);
+
+    gui_lock(gui);
+
+    do {
+        if(gui->direct_draw) {
+            break;
+        }
+
+        ViewPort* view_port = NULL;
+
+        if(gui->lockdown) {
+            view_port = gui_view_port_find_enabled(gui->layers[GuiLayerDesktop]);
+        } else {
+            view_port = gui_view_port_find_enabled(gui->layers[GuiLayerFullscreen]);
+            if(!view_port) view_port = gui_view_port_find_enabled(gui->layers[GuiLayerWindow]);
+            if(!view_port) view_port = gui_view_port_find_enabled(gui->layers[GuiLayerDesktop]);
+        }
+
+        if(view_port) {
+            view_port_ascii(view_port, ascii_event);
+        }
+    } while(false);
+
+    gui_unlock(gui);
+}
+
 void gui_lock(Gui* gui) {
     furi_assert(gui);
     furi_check(furi_mutex_acquire(gui->mutex, FuriWaitForever) == FuriStatusOk);
@@ -397,10 +429,11 @@ void gui_add_view_port(Gui* gui, ViewPort* view_port, GuiLayer layer) {
     furi_assert(view_port);
     furi_check(layer < GuiLayerMAX);
     // Only fullscreen supports Vertical orientation for now
-    furi_assert(
+    ViewPortOrientation view_port_orientation = view_port_get_orientation(view_port);
+    furi_check(
         (layer == GuiLayerFullscreen) ||
-        ((view_port->orientation != ViewPortOrientationVertical) &&
-         (view_port->orientation != ViewPortOrientationVerticalFlip)));
+        ((view_port_orientation != ViewPortOrientationVertical) &&
+         (view_port_orientation != ViewPortOrientationVerticalFlip)));
 
     gui_lock(gui);
     // Verify that view port is not yet added
@@ -604,9 +637,13 @@ Gui* gui_alloc() {
     // Input
     gui->input_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
     gui->input_events = furi_record_open(RECORD_INPUT_EVENTS);
+    gui->ascii_queue = furi_message_queue_alloc(8, sizeof(AsciiEvent));
+    gui->ascii_events = furi_record_open(RECORD_ASCII_EVENTS);
 
     furi_check(gui->input_events);
     furi_pubsub_subscribe(gui->input_events, gui_input_events_callback, gui);
+    furi_check(gui->ascii_events);
+    furi_pubsub_subscribe(gui->ascii_events, gui_ascii_events_callback, gui);
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     gui_add_view_port(gui, storage->sd_gui.view_port, GuiLayerStatusBarLeft);
@@ -630,6 +667,14 @@ int32_t gui_srv(void* p) {
             InputEvent input_event;
             while(furi_message_queue_get(gui->input_queue, &input_event, 0) == FuriStatusOk) {
                 gui_input(gui, &input_event);
+            }
+        }
+        // Process and dispatch ascii
+        if(flags & GUI_THREAD_FLAG_ASCII) {
+            // Process till queue become empty
+            AsciiEvent ascii_event;
+            while(furi_message_queue_get(gui->ascii_queue, &ascii_event, 0) == FuriStatusOk) {
+                gui_ascii(gui, &ascii_event);
             }
         }
         // Process and dispatch draw call

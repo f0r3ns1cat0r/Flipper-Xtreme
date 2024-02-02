@@ -22,6 +22,7 @@ static ArchiveApp* archive_alloc() {
     ArchiveApp* archive = malloc(sizeof(ArchiveApp));
 
     archive->fav_move_str = furi_string_alloc();
+    archive->file_extension = furi_string_alloc();
 
     archive->scene_manager = scene_manager_alloc(&archive_scene_handlers, archive);
     archive->view_dispatcher = view_dispatcher_alloc();
@@ -50,6 +51,11 @@ static ArchiveApp* archive_alloc() {
         view_dispatcher, ArchiveViewStack, view_stack_get_view(archive->view_stack));
 
     archive->browser = browser_alloc();
+    with_view_model(
+        archive->browser->view,
+        ArchiveBrowserViewModel * model,
+        { model->archive = archive; },
+        true);
     view_dispatcher_add_view(
         archive->view_dispatcher, ArchiveViewBrowser, archive_browser_get_view(archive->browser));
 
@@ -62,6 +68,14 @@ static ArchiveApp* archive_alloc() {
 void archive_free(ArchiveApp* archive) {
     furi_assert(archive);
     ViewDispatcher* view_dispatcher = archive->view_dispatcher;
+
+    scene_manager_set_scene_state(archive->scene_manager, ArchiveAppSceneInfo, false);
+    scene_manager_set_scene_state(archive->scene_manager, ArchiveAppSceneSearch, false);
+    if(archive->thread) {
+        furi_thread_join(archive->thread);
+        furi_thread_free(archive->thread);
+        archive->thread = NULL;
+    }
 
     // Loading
     loading_free(archive->loading);
@@ -82,6 +96,7 @@ void archive_free(ArchiveApp* archive) {
 
     browser_free(archive->browser);
     furi_string_free(archive->fav_move_str);
+    furi_string_free(archive->file_extension);
 
     furi_record_close(RECORD_DIALOGS);
     archive->dialogs = NULL;
@@ -93,18 +108,17 @@ void archive_free(ArchiveApp* archive) {
 }
 
 void archive_show_loading_popup(ArchiveApp* context, bool show) {
-    TaskHandle_t timer_task = xTaskGetHandle(configTIMER_SERVICE_TASK_NAME);
     ViewStack* view_stack = context->view_stack;
     Loading* loading = context->loading;
 
     if(show) {
         // Raise timer priority so that animations can play
-        vTaskPrioritySet(timer_task, configMAX_PRIORITIES - 1);
+        furi_timer_set_thread_priority(FuriTimerThreadPriorityElevated);
         view_stack_add_view(view_stack, loading_get_view(loading));
     } else {
         view_stack_remove_view(view_stack, loading_get_view(loading));
         // Restore default timer priority
-        vTaskPrioritySet(timer_task, configTIMER_TASK_PRIORITY);
+        furi_timer_set_thread_priority(FuriTimerThreadPriorityNormal);
     }
 }
 

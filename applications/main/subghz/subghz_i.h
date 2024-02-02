@@ -9,11 +9,6 @@
 #include "views/subghz_frequency_analyzer.h"
 #include "views/subghz_read_raw.h"
 
-#include "views/subghz_test_carrier.h"
-#if FURI_DEBUG
-#include "views/subghz_test_static.h"
-#include "views/subghz_test_packet.h"
-#endif
 #include <gui/gui.h>
 #include <assets_icons.h>
 #include <dialogs/dialogs.h>
@@ -44,13 +39,16 @@
 #include "helpers/subghz_threshold_rssi.h"
 
 #include "helpers/subghz_txrx.h"
+#include "helpers/subghz_gps.h"
 
 #define SUBGHZ_MAX_LEN_NAME 64
 #define SUBGHZ_EXT_PRESET_NAME true
+#define SUBGHZ_RAW_THRESHOLD_MIN (-90.0f)
+#define SUBGHZ_MEASURE_LOADING false
 
 typedef struct {
     uint8_t fix[4];
-    uint8_t cnt[3];
+    uint8_t cnt[4];
     uint8_t seed[4];
 } SecureData;
 
@@ -81,20 +79,17 @@ struct SubGhz {
     SubGhzFrequencyAnalyzer* subghz_frequency_analyzer;
     SubGhzReadRAW* subghz_read_raw;
     bool raw_send_only;
-    SubGhzTestCarrier* subghz_test_carrier;
-#if FURI_DEBUG
-    SubGhzTestStatic* subghz_test_static;
-    SubGhzTestPacket* subghz_test_packet;
-#endif
+
+    bool save_datetime_set;
+    FuriHalRtcDateTime save_datetime;
+
     SubGhzLastSettings* last_settings;
 
     SubGhzProtocolFlag filter;
+    SubGhzProtocolFilter ignore_filter;
+    bool remove_duplicates;
     FuriString* error_str;
     SubGhzLock lock;
-
-    bool ignore_starline;
-    bool ignore_auto_alarms;
-    bool ignore_magellan;
 
     SecureData* secure_data;
 
@@ -103,22 +98,24 @@ struct SubGhz {
     SubGhzThresholdRssi* threshold_rssi;
     SubGhzRxKeyState rx_key_state;
     SubGhzHistory* history;
+    SubGhzGPS* gps;
+    SubGhzRepeaterState repeater;
+    bool repeater_bin_raw_was_off;
 
     uint16_t idx_menu_chosen;
     SubGhzLoadTypeFile load_type_file;
 
     bool fav_timeout;
-    FuriTimer* fav_timer;
+    FuriTimer* timer;
 
     void* rpc_ctx;
 };
 
-void subghz_set_default_preset(SubGhz* subghz);
 void subghz_blink_start(SubGhz* subghz);
 void subghz_blink_stop(SubGhz* subghz);
 
 bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format);
-void subghz_dialog_message_show_only_rx(SubGhz* subghz);
+void subghz_dialog_message_freq_error(SubGhz* subghz, bool only_rx);
 
 bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog);
 bool subghz_get_next_name_file(SubGhz* subghz, uint8_t max_len);

@@ -30,22 +30,9 @@ bindings/
 .mxproject
 Brewfile.lock.json
 
-# Visual Studio Code
-/.vscode/
-
-# Visual Studio
-.vs/
-
 # Kate
 .kateproject
 .kateconfig
-
-# legendary cmake's
-build
-CMakeLists.txt
-
-# bundle output
-dist
 
 # kde
 .directory
@@ -53,8 +40,19 @@ null.d
 
 # SCons
 .sconsign.dblite
+
+
+# Visual Studio Code
+/.vscode
+
+# Visual Studio
+/.vs
+
+# bundle output
+/dist
+
 # SCons build dir
-build/
+/build
 
 # Toolchain
 /toolchain
@@ -69,17 +67,4 @@ PVS-Studio.log
 
 .gdbinit
 
-
-# XFW-specific:
-
-# Automate files, etc
-automate.py
-deployments/
-commitnotes.md
-fbt_options.py
-
-# Asset packs
-assets/dolphin/custom/*
-!assets/dolphin/custom/WatchDogs/
-!assets/dolphin/custom/ReadMe.md
-assets/resources/dolphin_custom/
+/fbt_options_local.py

@@ -4,9 +4,10 @@
 struct SubGhzEnvironment {
     SubGhzKeystore* keystore;
     const SubGhzProtocolRegistry* protocol_registry;
-    const char* came_atomo_rainbow_table_file_name;
     const char* nice_flor_s_rainbow_table_file_name;
     const char* alutech_at_4n_rainbow_table_file_name;
+    const char* mfname;
+    uint8_t kl_type;
 };
 
 SubGhzEnvironment* subghz_environment_alloc() {
@@ -14,9 +15,10 @@ SubGhzEnvironment* subghz_environment_alloc() {
 
     instance->keystore = subghz_keystore_alloc();
     instance->protocol_registry = NULL;
-    instance->came_atomo_rainbow_table_file_name = NULL;
     instance->nice_flor_s_rainbow_table_file_name = NULL;
     instance->alutech_at_4n_rainbow_table_file_name = NULL;
+    instance->mfname = "";
+    instance->kl_type = 0;
 
     return instance;
 }
@@ -25,7 +27,6 @@ void subghz_environment_free(SubGhzEnvironment* instance) {
     furi_assert(instance);
 
     instance->protocol_registry = NULL;
-    instance->came_atomo_rainbow_table_file_name = NULL;
     instance->nice_flor_s_rainbow_table_file_name = NULL;
     instance->alutech_at_4n_rainbow_table_file_name = NULL;
     subghz_keystore_free(instance->keystore);
@@ -48,16 +49,17 @@ SubGhzKeystore* subghz_environment_get_keystore(SubGhzEnvironment* instance) {
 void subghz_environment_set_came_atomo_rainbow_table_file_name(
     SubGhzEnvironment* instance,
     const char* filename) {
-    furi_assert(instance);
-
-    instance->came_atomo_rainbow_table_file_name = filename;
+    UNUSED(instance);
+    UNUSED(filename);
+    // Do nothing :)
+    return;
 }
 
 const char*
     subghz_environment_get_came_atomo_rainbow_table_file_name(SubGhzEnvironment* instance) {
-    furi_assert(instance);
-
-    return instance->came_atomo_rainbow_table_file_name;
+    UNUSED(instance);
+    // No table, sorry
+    return "";
 }
 
 void subghz_environment_set_alutech_at_4n_rainbow_table_file_name(
@@ -92,16 +94,17 @@ const char*
 
 void subghz_environment_set_protocol_registry(
     SubGhzEnvironment* instance,
-    void* protocol_registry_items) {
+    const SubGhzProtocolRegistry* protocol_registry_items) {
     furi_assert(instance);
     const SubGhzProtocolRegistry* protocol_registry = protocol_registry_items;
     instance->protocol_registry = protocol_registry;
 }
 
-void* subghz_environment_get_protocol_registry(SubGhzEnvironment* instance) {
+const SubGhzProtocolRegistry*
+    subghz_environment_get_protocol_registry(SubGhzEnvironment* instance) {
     furi_assert(instance);
     furi_assert(instance->protocol_registry);
-    return (void*)instance->protocol_registry;
+    return instance->protocol_registry;
 }
 
 const char*
@@ -115,4 +118,10 @@ const char*
     } else {
         return NULL;
     }
+}
+
+void subghz_environment_reset_keeloq(SubGhzEnvironment* instance) {
+    furi_assert(instance);
+
+    subghz_keystore_reset_kl(instance->keystore);
 }

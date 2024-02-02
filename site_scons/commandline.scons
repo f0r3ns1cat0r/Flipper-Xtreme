@@ -101,11 +101,6 @@ vars.AddVariables(
         "${DIST_SUFFIX}",
     ),
     (
-        "FORCE_NO_DIRTY",
-        "Force disable dirty status of the build",
-        "",
-    ),
-    (
         "COPRO_CUBE_VERSION",
         "Cube version",
         "",
@@ -180,9 +175,21 @@ vars.AddVariables(
         "Blackmagic probe location",
         "auto",
     ),
+    EnumVariable(
+        "SWD_TRANSPORT",
+        help="SWD interface adapter type",
+        default="auto",
+        allowed_values=[
+            "auto",
+            "cmsis-dap",
+            "stlink",
+            "blackmagic_usb",
+            "blackmagic_wifi",
+        ],
+    ),
     (
-        "OPENOCD_ADAPTER_SERIAL",
-        "OpenOCD adapter serial number",
+        "SWD_TRANSPORT_SERIAL",
+        "SWD interface adapter serial number",
         "auto",
     ),
     (
@@ -233,6 +240,7 @@ vars.AddVariables(
             ("applications/debug", False),
             ("applications/external", False),
             ("applications/examples", False),
+            ("applications/drivers", False),
             ("applications_user", False),
         ],
     ),
@@ -240,6 +248,32 @@ vars.AddVariables(
         "PVSNOBROWSER",
         help="Don't open browser after generating error repots",
         default=False,
+    ),
+    (
+        "FIRMWARE_ORIGIN",
+        "Firmware origin. 'Official' if follows upstream's API structure, otherwise fork name. "
+        " This will also create a C define FW_ORIGIN_<origin> so that "
+        " app can check what version it is being built for.",
+        "Official",
+    ),
+    (
+        "FLIP_PORT",
+        "Full port name of Flipper to use, if multiple Flippers are connected",
+        "auto",
+    ),
+    EnumVariable(
+        "LANG_SERVER",
+        help="Language server type for vscode_dist.",
+        default="cpptools",
+        allowed_values=[
+            "cpptools",
+            "clangd",
+        ],
+    ),
+    BoolVariable(
+        "STRICT_FAP_IMPORT_CHECK",
+        help="Enable strict import check for .faps",
+        default=True,
     ),
 )
 

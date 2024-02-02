@@ -10,6 +10,7 @@
 
 struct ViewPort {
     Gui* gui;
+    FuriMutex* mutex;
     bool is_enabled;
     ViewPortOrientation orientation;
 
@@ -21,6 +22,9 @@ struct ViewPort {
 
     ViewPortInputCallback input_callback;
     void* input_callback_context;
+
+    ViewPortAsciiCallback ascii_callback;
+    void* ascii_callback_context;
 };
 
 /** Set GUI reference.
@@ -49,3 +53,12 @@ void view_port_draw(ViewPort* view_port, Canvas* canvas);
  * @param      event      pointer to input event
  */
 void view_port_input(ViewPort* view_port, InputEvent* event);
+
+/** Process ascii. Calls ascii callback.
+ *
+ * To be used by GUI, called on ascii dispatch.
+ *
+ * @param      view_port  ViewPort instance
+ * @param      event      pointer to ascii event
+ */
+void view_port_ascii(ViewPort* view_port, AsciiEvent* event);

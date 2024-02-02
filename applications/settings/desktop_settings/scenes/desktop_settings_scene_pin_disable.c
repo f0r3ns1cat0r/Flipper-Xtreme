@@ -18,14 +18,15 @@ static void pin_disable_back_callback(void* context) {
 void desktop_settings_scene_pin_disable_on_enter(void* context) {
     furi_assert(context);
     DesktopSettingsApp* app = context;
-    app->settings.pin_code.length = 0;
-    memset(app->settings.pin_code.data, '0', sizeof(app->settings.pin_code.data));
-    DESKTOP_SETTINGS_SAVE(&app->settings);
+    app->desktop->settings.pin_code.length = 0;
+    memset(
+        app->desktop->settings.pin_code.data, '0', sizeof(app->desktop->settings.pin_code.data));
+    app->save_settings = true;
 
     popup_set_context(app->popup, app);
     popup_set_callback(app->popup, pin_disable_back_callback);
-    popup_set_icon(app->popup, 0, 2, &I_DolphinMafia_115x62);
-    popup_set_header(app->popup, "PIN\nDeleted!", 95, 9, AlignCenter, AlignCenter);
+    popup_set_icon(app->popup, 0, 2, &I_DolphinMafia_119x62);
+    popup_set_header(app->popup, "Deleted", 80, 19, AlignLeft, AlignBottom);
     popup_set_timeout(app->popup, 1500);
     popup_enable_timeout(app->popup);
     view_dispatcher_switch_to_view(app->view_dispatcher, DesktopSettingsAppViewIdPopup);

@@ -6,12 +6,11 @@ App(
     requires=[
         "gui",
         "storage",
-        "archive",
     ],
     conflicts=["desktop"],
     entry_point="updater_srv",
     stack_size=2 * 1024,
-    order=120,
+    order=130,
 )
 
 App(
@@ -23,7 +22,6 @@ App(
         "gui",
         "storage",
         "bt",
-        "archive",
     ],
     conflicts=["updater"],
     provides=["updater_start"],

@@ -7,7 +7,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 
-#include "../blocks/custom_btn.h"
+#include "../blocks/custom_btn_i.h"
 
 #define TAG "SubGhzProtocolSomfyTelis"
 
@@ -125,7 +125,7 @@ static bool subghz_protocol_somfy_telis_gen_data(
     btn = subghz_protocol_somfy_telis_get_btn_code();
 
     if(instance->generic.cnt < 0xFFFF) {
-        if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) >= 0xFFFF) {
+        if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) > 0xFFFF) {
             instance->generic.cnt = 0;
         } else {
             instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
@@ -189,7 +189,7 @@ bool subghz_protocol_somfy_telis_create_data(
 
 /**
  * Generating an upload from data.
- * @param instance Pointer to a SubGhzProtocolEncoderKeeloq instance
+ * @param instance Pointer to a SubGhzProtocolEncoderSomfyTelis instance
  * @return true On success
  */
 static bool subghz_protocol_encoder_somfy_telis_get_upload(
@@ -642,10 +642,10 @@ static const char* subghz_protocol_somfy_telis_get_name_button(uint8_t btn) {
     return btn <= 0xf ? name_btn[btn] : name_btn[0];
 }
 
-uint8_t subghz_protocol_decoder_somfy_telis_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_somfy_telis_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderSomfyTelis* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
+    return subghz_protocol_blocks_get_hash_data_long(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 

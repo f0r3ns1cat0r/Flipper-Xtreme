@@ -11,6 +11,27 @@ WINPATHSEP_RE = re.compile(r"\\([^\"'\\]|$)")
 # Excludes all files ending with ~, usually created by editors as backup files
 GLOB_FILE_EXCLUSION = ["*~"]
 
+# List of environment variables to proxy to child processes
+FORWARDED_ENV_VARIABLES = [
+    # CI/CD variables
+    "WORKFLOW_BRANCH_OR_TAG",
+    "DIST_SUFFIX",
+    # Python & other tools
+    "HOME",
+    "APPDATA",
+    "PYTHONHOME",
+    "PYTHONNOUSERSITE",
+    "TMP",
+    "TEMP",
+    # ccache
+    "CCACHE_DISABLE",
+    # Colors for tools
+    "TERM",
+    # Toolchain
+    "FBT_TOOLCHAIN_PATH",
+    "UFBT_HOME",
+]
+
 
 def tempfile_arg_esc_func(arg):
     arg = quote_spaces(arg)
@@ -45,7 +66,7 @@ def single_quote(arg_list):
     return " ".join(f"'{arg}'" if " " in arg else str(arg) for arg in arg_list)
 
 
-def extract_abs_dir(node):
+def resolve_real_dir_node(node):
     if isinstance(node, SCons.Node.FS.EntryProxy):
         node = node.get()
 
@@ -53,13 +74,7 @@ def extract_abs_dir(node):
         if os.path.exists(repo_dir.abspath):
             return repo_dir
 
-
-def extract_abs_dir_path(node):
-    abs_dir_node = extract_abs_dir(node)
-    if abs_dir_node is None:
-        raise StopError(f"Can't find absolute path for {node.name}")
-
-    return abs_dir_node.abspath
+    raise StopError(f"Can't find absolute path for {node.name} ({node})")
 
 
 def path_as_posix(path):

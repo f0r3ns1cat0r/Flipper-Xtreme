@@ -4,7 +4,6 @@ enum VarItemListIndex {
     VarItemListIndexInterface,
     VarItemListIndexProtocols,
     VarItemListIndexMisc,
-    VarItemListIndexVersion,
 };
 
 void xtreme_app_scene_start_var_item_list_callback(void* context, uint32_t index) {
@@ -15,11 +14,18 @@ void xtreme_app_scene_start_var_item_list_callback(void* context, uint32_t index
 void xtreme_app_scene_start_on_enter(void* context) {
     XtremeApp* app = context;
     VariableItemList* var_item_list = app->var_item_list;
+    VariableItem* item;
 
-    variable_item_list_add(var_item_list, "Interface", 0, NULL, app);
-    variable_item_list_add(var_item_list, "Protocols", 0, NULL, app);
-    variable_item_list_add(var_item_list, "Misc", 0, NULL, app);
-    variable_item_list_add(var_item_list, furi_string_get_cstr(app->version_tag), 0, NULL, app);
+    item = variable_item_list_add(var_item_list, "Interface", 0, NULL, app);
+    variable_item_set_current_value_text(item, ">");
+
+    item = variable_item_list_add(var_item_list, "Protocols", 0, NULL, app);
+    variable_item_set_current_value_text(item, ">");
+
+    item = variable_item_list_add(var_item_list, "Misc", 0, NULL, app);
+    variable_item_set_current_value_text(item, ">");
+
+    variable_item_list_set_header(var_item_list, furi_string_get_cstr(app->version_tag));
 
     variable_item_list_set_enter_callback(
         var_item_list, xtreme_app_scene_start_var_item_list_callback, app);
@@ -39,24 +45,17 @@ bool xtreme_app_scene_start_on_event(void* context, SceneManagerEvent event) {
         consumed = true;
         switch(event.event) {
         case VarItemListIndexInterface:
+            scene_manager_set_scene_state(app->scene_manager, XtremeAppSceneInterface, 0);
             scene_manager_next_scene(app->scene_manager, XtremeAppSceneInterface);
             break;
         case VarItemListIndexProtocols:
+            scene_manager_set_scene_state(app->scene_manager, XtremeAppSceneProtocols, 0);
             scene_manager_next_scene(app->scene_manager, XtremeAppSceneProtocols);
             break;
         case VarItemListIndexMisc:
+            scene_manager_set_scene_state(app->scene_manager, XtremeAppSceneMisc, 0);
             scene_manager_next_scene(app->scene_manager, XtremeAppSceneMisc);
             break;
-        case VarItemListIndexVersion: {
-            if(storage_common_copy(
-                   furi_record_open(RECORD_STORAGE),
-                   EXT_PATH("dolphin/xfwfirstboot.bin"),
-                   EXT_PATH(".slideshow"))) {
-                app->show_slideshow = true;
-                xtreme_app_apply(app);
-            }
-            break;
-        }
         default:
             break;
         }

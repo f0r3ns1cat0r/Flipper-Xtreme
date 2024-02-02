@@ -49,13 +49,13 @@ class DolphinBubbleAnimation:
 
     def load(self, animation_directory: str):
         if not os.path.isdir(animation_directory):
-            raise Exception(f"Animation folder doesn't exists: { animation_directory }")
+            raise Exception(f"Animation folder doesn't exist: { animation_directory }")
 
         meta_filename = os.path.join(animation_directory, "meta.txt")
         if not os.path.isfile(meta_filename):
-            raise Exception(f"Animation meta file doesn't exists: { meta_filename }")
+            raise Exception(f"Animation meta file doesn't exist: { meta_filename }")
 
-        self.logger.info(f"Loading meta from {meta_filename}")
+        self.logger.debug(f"Loading meta from {meta_filename}")
         file = FlipperFormatFile()
         file.load(meta_filename)
 
@@ -267,7 +267,7 @@ class DolphinManifest:
         # Load animation data
         while True:
             try:
-                # Read animation spcification
+                # Read animation specification
                 name = file.readKey("Name")
                 min_butthurt = file.readKeyInt("Min butthurt")
                 max_butthurt = file.readKeyInt("Max butthurt")

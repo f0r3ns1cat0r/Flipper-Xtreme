@@ -7,10 +7,7 @@
 #include <lib/subghz/receiver.h>
 #include <lib/subghz/transmitter.h>
 #include <lib/subghz/protocols/raw.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <lib/subghz/devices/devices.h>
 
 typedef struct SubGhzTxRx SubGhzTxRx;
 
@@ -50,6 +47,8 @@ bool subghz_txrx_is_database_loaded(SubGhzTxRx* instance);
  * @param instance Pointer to a SubGhzTxRx
  * @param preset_name Name of preset
  * @param frequency Frequency in Hz
+ * @param latitude Latitude in float
+ * @param longitude Longitude in float
  * @param preset_data Data of preset
  * @param preset_data_size Size of preset data
  */
@@ -57,6 +56,8 @@ void subghz_txrx_set_preset(
     SubGhzTxRx* instance,
     const char* preset_name,
     uint32_t frequency,
+    float latitude,
+    float longitude,
     uint8_t* preset_data,
     size_t preset_data_size);
 
@@ -89,6 +90,18 @@ void subghz_txrx_get_frequency_and_modulation(
     FuriString* frequency,
     FuriString* modulation,
     bool long_name);
+
+/**
+ * Get string latitude and longitude
+ * 
+ * @param instance Pointer to a SubGhzTxRx
+ * @param latitude Pointer to a string latitude
+ * @param longitude Pointer to a string longitude
+*/
+void subghz_txrx_get_latitude_and_longitude(
+    SubGhzTxRx* instance,
+    FuriString* latitude,
+    FuriString* longitude);
 
 /**
  * Start TX CC1101
@@ -277,7 +290,7 @@ void subghz_txrx_receiver_set_filter(SubGhzTxRx* instance, SubGhzProtocolFlag fi
  * @param callback Callback for receive data
  * @param context Context for callback
  */
-void subghz_txrx_set_rx_calback(
+void subghz_txrx_set_rx_callback(
     SubGhzTxRx* instance,
     SubGhzReceiverCallback callback,
     void* context);
@@ -294,11 +307,75 @@ void subghz_txrx_set_raw_file_encoder_worker_callback_end(
     SubGhzProtocolEncoderRAWCallbackEnd callback,
     void* context);
 
+/* Checking if an external radio device is connected
+* 
+* @param instance Pointer to a SubGhzTxRx
+* @param name Name of external radio device
+* @return bool True if is connected to the external radio device
+*/
+bool subghz_txrx_radio_device_is_external_connected(SubGhzTxRx* instance, const char* name);
+
+/* Set the selected radio device to use
+*
+* @param instance Pointer to a SubGhzTxRx
+* @param radio_device_type Radio device type
+* @return SubGhzRadioDeviceType Type of installed radio device
+*/
+SubGhzRadioDeviceType
+    subghz_txrx_radio_device_set(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type);
+
+/* Get the selected radio device to use
+*
+* @param instance Pointer to a SubGhzTxRx
+* @return SubGhzRadioDeviceType Type of installed radio device
+*/
+SubGhzRadioDeviceType subghz_txrx_radio_device_get(SubGhzTxRx* instance);
+
+/* Get RSSI the selected radio device to use
+*
+* @param instance Pointer to a SubGhzTxRx
+* @return float RSSI
+*/
+float subghz_txrx_radio_device_get_rssi(SubGhzTxRx* instance);
+
+/* Get name the selected radio device to use
+*
+* @param instance Pointer to a SubGhzTxRx
+* @return const char* Name of installed radio device
+*/
+const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance);
+
+/* Get intelligence whether frequency the selected radio device to use
+*
+* @param instance Pointer to a SubGhzTxRx
+* @return bool True if the frequency is valid
+*/
+bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency);
+
+bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency);
+
 void subghz_txrx_set_debug_pin_state(SubGhzTxRx* instance, bool state);
 bool subghz_txrx_get_debug_pin_state(SubGhzTxRx* instance);
 
+void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance);
+
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance); // TODO use only in DecodeRaw
 
-#ifdef __cplusplus
-}
-#endif
+/**
+ * @brief Set current preset AM650 without additional params
+ * 
+ * @param instance - instance Pointer to a SubGhzTxRx
+ * @param frequency - frequency of preset, if pass 0 then taking default frequency 433.92MHz
+ */
+void subghz_txrx_set_default_preset(SubGhzTxRx* instance, uint32_t frequency);
+
+/**
+ * @brief Set current preset by index
+ * 
+ * @param instance  - instance Pointer to a SubGhzTxRx
+ * @param frequency - frequency of new preset
+ * @param index - index of preset taken from SubGhzSetting
+ * @return const char* -  name of preset
+ */
+const char*
+    subghz_txrx_set_preset_internal(SubGhzTxRx* instance, uint32_t frequency, uint8_t index);

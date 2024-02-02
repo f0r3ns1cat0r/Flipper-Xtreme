@@ -1,17 +1,12 @@
 #pragma once
 
 #include <gui/view.h>
+#include "../helpers/subghz_types.h"
 #include "../helpers/subghz_custom_event.h"
 
-#define SUBGHZ_RAW_THRESHOLD_MIN -90.0f
+typedef struct SubGhzReadRAW SubGhzReadRAW;
 
 typedef void (*SubGhzReadRAWCallback)(SubGhzCustomEvent event, void* context);
-
-typedef struct {
-    View* view;
-    SubGhzReadRAWCallback callback;
-    void* context;
-} SubGhzReadRAW;
 
 typedef enum {
     SubGhzReadRAWStatusStart,
@@ -26,22 +21,6 @@ typedef enum {
     SubGhzReadRAWStatusSaveKey,
 } SubGhzReadRAWStatus;
 
-typedef struct {
-    FuriString* frequency_str;
-    FuriString* preset_str;
-    FuriString* sample_write;
-    FuriString* file_name;
-    uint8_t* rssi_history;
-    uint8_t rssi_current;
-    bool rssi_history_end;
-    uint8_t ind_write;
-    uint8_t ind_sin;
-    SubGhzReadRAWStatus status;
-    bool raw_send_only;
-    float raw_threshold_rssi;
-    bool not_showing_samples;
-} SubGhzReadRAWModel;
-
 void subghz_read_raw_set_callback(
     SubGhzReadRAW* subghz_read_raw,
     SubGhzReadRAWCallback callback,
@@ -55,6 +34,10 @@ void subghz_read_raw_add_data_statusbar(
     SubGhzReadRAW* instance,
     const char* frequency_str,
     const char* preset_str);
+
+void subghz_read_raw_set_radio_device_type(
+    SubGhzReadRAW* instance,
+    SubGhzRadioDeviceType device_type);
 
 void subghz_read_raw_update_sample_write(SubGhzReadRAW* instance, size_t sample);
 

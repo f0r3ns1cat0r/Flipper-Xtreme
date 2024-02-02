@@ -2,10 +2,6 @@
 
 #include "base.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define SUBGHZ_PROTOCOL_SOMFY_TELIS_NAME "Somfy Telis"
 
 typedef struct SubGhzProtocolDecoderSomfyTelis SubGhzProtocolDecoderSomfyTelis;
@@ -27,24 +23,6 @@ void* subghz_protocol_encoder_somfy_telis_alloc(SubGhzEnvironment* environment);
  * @param context Pointer to a SubGhzProtocolEncoderSomfyTelis instance
  */
 void subghz_protocol_encoder_somfy_telis_free(void* context);
-
-/**
- * Key generation from simple data.
- * @param context Pointer to a SubGhzProtocolEncoderSomfyTelis instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @param serial Serial number, 24 bit
- * @param btn Button number, 8 bit
- * @param cnt Counter value, 16 bit
- * @param preset Modulation, SubGhzRadioPreset
- * @return true On success
- */
-bool subghz_protocol_somfy_telis_create_data(
-    void* context,
-    FlipperFormat* flipper_format,
-    uint32_t serial,
-    uint8_t btn,
-    uint16_t cnt,
-    SubGhzRadioPreset* preset);
 
 /**
  * Deserialize and generating an upload to send.
@@ -100,7 +78,7 @@ void subghz_protocol_decoder_somfy_telis_feed(void* context, bool level, uint32_
  * @param context Pointer to a SubGhzProtocolDecoderSomfyTelis instance
  * @return hash Hash sum
  */
-uint8_t subghz_protocol_decoder_somfy_telis_get_hash_data(void* context);
+uint32_t subghz_protocol_decoder_somfy_telis_get_hash_data(void* context);
 
 /**
  * Serialize data SubGhzProtocolDecoderSomfyTelis.
@@ -129,7 +107,3 @@ SubGhzProtocolStatus
  * @param output Resulting text
  */
 void subghz_protocol_decoder_somfy_telis_get_string(void* context, FuriString* output);
-
-#ifdef __cplusplus
-}
-#endif

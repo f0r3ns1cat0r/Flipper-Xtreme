@@ -7,7 +7,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 
-#include "../blocks/custom_btn.h"
+#include "../blocks/custom_btn_i.h"
 
 /*
 * Help
@@ -15,7 +15,7 @@
 * https://github.com/merbanan/rtl_433/blob/master/src/devices/secplus_v2.c
 */
 
-#define TAG "SubGhzProtocoSecPlus_v2"
+#define TAG "SubGhzProtocoSecPlusV2"
 
 #define SECPLUS_V2_HEADER 0x3C0000000000
 #define SECPLUS_V2_HEADER_MASK 0xFFFF3C0000000000
@@ -771,10 +771,10 @@ void subghz_protocol_decoder_secplus_v2_feed(void* context, bool level, uint32_t
     }
 }
 
-uint8_t subghz_protocol_decoder_secplus_v2_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_secplus_v2_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderSecPlus_v2* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
+    return subghz_protocol_blocks_get_hash_data_long(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 

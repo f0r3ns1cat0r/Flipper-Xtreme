@@ -1,6 +1,4 @@
 #!/usb/bin/env python3
-VERSION = "XFW-0047"
-
 import json
 import os
 import subprocess
@@ -12,8 +10,9 @@ from flipper.app import App
 class GitVersion:
     REVISION_SUFFIX_LENGTH = 8
 
-    def __init__(self, source_dir):
+    def __init__(self, source_dir, suffix):
         self.source_dir = source_dir
+        self.suffix = suffix
 
     def get_version_info(self):
         commit = (
@@ -32,25 +31,43 @@ class GitVersion:
         # (set by CI)
         branch = (
             os.environ.get("WORKFLOW_BRANCH_OR_TAG", None)
-            or VERSION
             or self._exec_git("rev-parse --abbrev-ref HEAD")
             or "unknown"
         )
 
-        branch_num = self._exec_git("rev-list --count HEAD") or "n/a"
+        version = (
+            self.suffix.split("_")[0]
+            or os.environ.get("DIST_SUFFIX", None)
+            or "unknown"
+        )
 
-        version = os.environ.get("DIST_SUFFIX", None) or VERSION or "unknown"
-
-        force_no_dirty = os.environ.get("FORCE_NO_DIRTY", None) or ""
-        if force_no_dirty != "":
-            dirty = False
+        if "SOURCE_DATE_EPOCH" in os.environ:
+            commit_date = datetime.utcfromtimestamp(
+                int(os.environ["SOURCE_DATE_EPOCH"])
+            )
+        else:
+            commit_date = datetime.strptime(
+                self._exec_git("log -1 --format=%cd --date=default").strip(),
+                "%a %b %d %H:%M:%S %Y %z",
+            )
 
         return {
             "GIT_COMMIT": commit,
             "GIT_BRANCH": branch,
             "VERSION": version,
             "BUILD_DIRTY": dirty and 1 or 0,
+            "GIT_ORIGIN": self._get_git_origin(),
+            "GIT_COMMIT_DATE": commit_date,
         }
+
+    def _get_git_origin(self):
+        try:
+            branch = self._exec_git("branch --show-current")
+            remote = self._exec_git(f"config branch.{branch}.remote")
+            origin = self._exec_git(f"remote get-url {remote}")
+            return origin
+        except subprocess.CalledProcessError:
+            return ""
 
     def _exec_git(self, args):
         cmd = ["git"]
@@ -79,23 +96,37 @@ class Main(App):
             help="hardware target",
             required=True,
         )
+        self.parser_generate.add_argument(
+            "--fw-origin",
+            dest="firmware_origin",
+            type=str,
+            help="firmware origin",
+            required=True,
+        )
         self.parser_generate.add_argument("--dir", dest="sourcedir", required=True)
+        self.parser_generate.add_argument("--suffix", dest="suffix", required=True)
         self.parser_generate.set_defaults(func=self.generate)
 
     def generate(self):
-        current_info = GitVersion(self.args.sourcedir).get_version_info()
+        current_info = GitVersion(
+            self.args.sourcedir, self.args.suffix
+        ).get_version_info()
 
-        if "SOURCE_DATE_EPOCH" in os.environ:
-            build_date = datetime.utcfromtimestamp(int(os.environ["SOURCE_DATE_EPOCH"]))
-        else:
-            build_date = date.today()
+        build_date = (
+            date.today()
+            if current_info["BUILD_DIRTY"]
+            else current_info["GIT_COMMIT_DATE"]
+        )
 
         current_info.update(
             {
                 "BUILD_DATE": build_date.strftime("%d-%m-%Y"),
                 "TARGET": self.args.target,
+                "FIRMWARE_ORIGIN": self.args.firmware_origin,
             }
         )
+
+        del current_info["GIT_COMMIT_DATE"]
 
         version_values = []
         for key in current_info:

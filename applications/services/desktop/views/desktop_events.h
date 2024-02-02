@@ -1,31 +1,26 @@
 #pragma once
 
 typedef enum {
+    // Events with _ are unused, kept for compatibility
+    DesktopMainEventLockWithPin,
     DesktopMainEventOpenLockMenu,
     DesktopMainEventOpenArchive,
-    DesktopMainEventOpenFavoritePrimary,
-    DesktopMainEventOpenFavoriteSecondary,
+    _DesktopMainEventOpenFavoriteLeftShort,
+    _DesktopMainEventOpenFavoriteLeftLong,
+    _DesktopMainEventOpenFavoriteRightShort,
+    _DesktopMainEventOpenFavoriteRightLong,
     DesktopMainEventOpenMenu,
-    DesktopMainEventOpenGames,
     DesktopMainEventOpenDebug,
-    DesktopMainEventOpenPassport,
     DesktopMainEventOpenPowerOff,
-    DesktopMainEventLock,
 
-    DesktopMainEventOpenSnake,
-    DesktopMainEventOpen2048,
-    DesktopMainEventOpenZombiez,
-    DesktopMainEventOpenTetris,
-    DesktopMainEventOpenDOOM,
-    DesktopMainEventOpenDice,
-    DesktopMainEventOpenArkanoid,
-    DesktopMainEventOpenHeap,
-    DesktopMainEventOpenSubRemote,
-    DesktopMainEventOpenClock,
+    _DesktopDummyEventOpenLeft,
+    _DesktopDummyEventOpenDown,
+    _DesktopDummyEventOpenOk,
 
     DesktopLockedEventUnlocked,
     DesktopLockedEventUpdate,
     DesktopLockedEventShowPinInput,
+    DesktopLockedEventCoversClosed,
 
     DesktopPinInputEventResetWrongPinLabel,
     DesktopPinInputEventUnlocked,
@@ -39,11 +34,9 @@ typedef enum {
     DesktopDebugEventSaveState,
     DesktopDebugEventExit,
 
-    DesktopLockMenuEventSettings,
-    DesktopLockMenuEventLock,
-    DesktopLockMenuEventLockPin,
-    DesktopLockMenuEventLockPinOff,
-    DesktopLockMenuEventXtreme,
+    DesktopLockMenuEventLockPinCode,
+    _DesktopLockMenuEventDummyModeOn,
+    _DesktopLockMenuEventDummyModeOff,
     DesktopLockMenuEventStealthModeOn,
     DesktopLockMenuEventStealthModeOff,
 
@@ -58,4 +51,12 @@ typedef enum {
     DesktopGlobalBeforeAppStarted,
     DesktopGlobalAfterAppFinished,
     DesktopGlobalAutoLock,
+    DesktopGlobalApiUnlock,
+
+    DesktopMainEventLockKeypad,
+    DesktopLockedEventOpenPowerOff,
+    DesktopLockMenuEventSettings,
+    DesktopLockMenuEventLockKeypad,
+    DesktopLockMenuEventLockPinOff,
+    DesktopLockMenuEventXtreme,
 } DesktopEvent;

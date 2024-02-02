@@ -59,6 +59,15 @@ VariableItem* variable_item_list_add(
     VariableItemChangeCallback change_callback,
     void* context);
 
+/** Get item in VariableItemList
+ *
+ * @param      variable_item_list  VariableItemList instance
+ * @param      position            index of the item to get
+ *
+ * @return     VariableItem* item instance
+ */
+VariableItem* variable_item_list_get(VariableItemList* variable_item_list, uint8_t position);
+
 /** Set enter callback
  *
  * @param      variable_item_list  VariableItemList instance
@@ -74,6 +83,14 @@ void variable_item_list_set_selected_item(VariableItemList* variable_item_list, 
 
 uint8_t variable_item_list_get_selected_item_index(VariableItemList* variable_item_list);
 
+/** Set optional header for variable item list
+ * Must be called before adding items OR after adding items but also call set_selected_item() after set_header()
+ *
+ * @param      variable_item_list  VariableItemList instance
+ * @param      header              header to set
+ */
+void variable_item_list_set_header(VariableItemList* variable_item_list, const char* header);
+
 /** Set item current selected index
  *
  * @param      item                 VariableItem* instance
@@ -87,6 +104,13 @@ void variable_item_set_current_value_index(VariableItem* item, uint8_t current_v
  * @param      values_count         The new values count
  */
 void variable_item_set_values_count(VariableItem* item, uint8_t values_count);
+
+/** Set number of values for item
+ *
+ * @param      item                 VariableItem* instance
+ * @param      label                The new label text
+ */
+void variable_item_set_item_label(VariableItem* item, const char* label);
 
 /** Set item current selected text
  *

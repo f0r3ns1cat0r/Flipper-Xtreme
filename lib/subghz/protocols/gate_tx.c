@@ -227,7 +227,7 @@ void subghz_protocol_decoder_gate_tx_feed(void* context, bool level, uint32_t du
             if(duration >= ((uint32_t)subghz_protocol_gate_tx_const.te_short * 10 +
                             subghz_protocol_gate_tx_const.te_delta)) {
                 instance->decoder.parser_step = GateTXDecoderStepFoundStartBit;
-                if(instance->decoder.decode_count_bit >=
+                if(instance->decoder.decode_count_bit ==
                    subghz_protocol_gate_tx_const.min_count_bit_for_found) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
@@ -283,10 +283,10 @@ static void subghz_protocol_gate_tx_check_remote_controller(SubGhzBlockGeneric* 
     instance->btn = ((code_found_reverse >> 16) & 0x0F);
 }
 
-uint8_t subghz_protocol_decoder_gate_tx_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_gate_tx_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderGateTx* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
+    return subghz_protocol_blocks_get_hash_data_long(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 

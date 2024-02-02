@@ -26,7 +26,6 @@ Applications for main Flipper menu.
 
 - `archive`             - Archive and file manager 
 - `bad_kb`              - Bad KB application
-- `fap_loader`          - External applications loader
 - `gpio`                - GPIO application: includes USART bridge and GPIO control
 - `ibutton`             - iButton application, onewire keys and more
 - `infrared`            - Infrared application, controls your IR devices
@@ -56,7 +55,6 @@ External applications deployed to SD Card
 Background services providing system APIs to applications.
 
 - `applications.h`      - Firmware application list header
-
 - `bt`                  - BLE service and application
 - `cli`                 - Console service and API
 - `crypto`              - Crypto cli tools

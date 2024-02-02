@@ -9,7 +9,9 @@
 #include <lib/toolbox/stream/stream.h>
 #include <lib/flipper_format/flipper_format_i.h>
 
-#define TAG "SubGhzProtocolBinRAW"
+#include <math.h>
+
+#define TAG "SubGhzProtocolBinRaw"
 
 //change very carefully, RAM ends at the most inopportune moment
 #define BIN_RAW_BUF_RAW_SIZE 2048
@@ -744,7 +746,6 @@ static bool
 
                             bin_raw_debug("\r\n\r\n");
 #endif
-                            //todo can be optimized
                             BinRAW_Markup markup_temp[BIN_RAW_MAX_MARKUP_COUNT];
                             memcpy(
                                 markup_temp,
@@ -770,7 +771,6 @@ static bool
                 }
             }
         }
-        //todo can be optimized
         if(bin_raw_type == BinRAWTypeGap) {
             if(data_temp != 0) { //there are sequences with the same number of bits
 
@@ -960,12 +960,19 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
     }
 }
 
-uint8_t subghz_protocol_decoder_bin_raw_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_bin_raw_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
-    return subghz_protocol_blocks_add_bytes(
-        instance->data + instance->data_markup[0].byte_bias,
-        subghz_protocol_bin_raw_get_full_byte(instance->data_markup[0].bit_count));
+    union {
+        uint32_t full;
+        uint8_t split[4];
+    } hash = {0};
+    uint8_t* p = instance->data + instance->data_markup[0].byte_bias;
+    size_t len = subghz_protocol_bin_raw_get_full_byte(instance->data_markup[0].bit_count);
+    for(size_t i = 0; i < len; i++) {
+        hash.split[i % sizeof(hash)] ^= p[i];
+    }
+    return hash.full;
 }
 
 SubGhzProtocolStatus subghz_protocol_decoder_bin_raw_serialize(

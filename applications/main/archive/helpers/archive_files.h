@@ -5,7 +5,7 @@
 #include <m-algo.h>
 #include <storage/storage.h>
 #include "toolbox/path.h"
-#include <xtreme.h>
+#include <xtreme/xtreme.h>
 
 #define FAP_MANIFEST_MAX_ICON_SIZE 32
 
@@ -15,9 +15,13 @@ typedef enum {
     ArchiveFileTypeSubGhz,
     ArchiveFileTypeLFRFID,
     ArchiveFileTypeInfrared,
+    ArchiveFileTypeSubghzPlaylist,
+    ArchiveFileTypeSubghzRemote,
+    ArchiveFileTypeInfraredRemote,
     ArchiveFileTypeBadKb,
     ArchiveFileTypeU2f,
     ArchiveFileTypeApplication,
+    ArchiveFileTypeSearch,
     ArchiveFileTypeUpdateManifest,
     ArchiveFileTypeFolder,
     ArchiveFileTypeUnknown,
@@ -31,7 +35,6 @@ typedef struct {
     FuriString* custom_name;
     bool fav;
     bool is_app;
-    bool is_text_file;
 } ArchiveFile_t;
 
 static void ArchiveFile_t_init(ArchiveFile_t* obj) {
@@ -41,7 +44,6 @@ static void ArchiveFile_t_init(ArchiveFile_t* obj) {
     obj->custom_name = furi_string_alloc();
     obj->fav = false;
     obj->is_app = false;
-    obj->is_text_file = false;
 }
 
 static void ArchiveFile_t_init_set(ArchiveFile_t* obj, const ArchiveFile_t* src) {
@@ -56,7 +58,6 @@ static void ArchiveFile_t_init_set(ArchiveFile_t* obj, const ArchiveFile_t* src)
     obj->custom_name = furi_string_alloc_set(src->custom_name);
     obj->fav = src->fav;
     obj->is_app = src->is_app;
-    obj->is_text_file = src->is_text_file;
 }
 
 static void ArchiveFile_t_set(ArchiveFile_t* obj, const ArchiveFile_t* src) {
@@ -71,7 +72,6 @@ static void ArchiveFile_t_set(ArchiveFile_t* obj, const ArchiveFile_t* src) {
     furi_string_set(obj->custom_name, src->custom_name);
     obj->fav = src->fav;
     obj->is_app = src->is_app;
-    obj->is_text_file = src->is_text_file;
 }
 
 static void ArchiveFile_t_clear(ArchiveFile_t* obj) {
@@ -84,7 +84,7 @@ static void ArchiveFile_t_clear(ArchiveFile_t* obj) {
 }
 
 static int ArchiveFile_t_cmp(const ArchiveFile_t* a, const ArchiveFile_t* b) {
-    if(XTREME_SETTINGS()->sort_dirs_first) {
+    if(xtreme_settings.sort_dirs_first) {
         if(a->type == ArchiveFileTypeFolder && b->type != ArchiveFileTypeFolder) {
             return -1;
         }
@@ -120,6 +120,6 @@ void archive_delete_file(void* context, const char* format, ...)
 FS_Error archive_copy_rename_file_or_dir(
     void* context,
     const char* src_path,
-    const char* dst_path,
+    FuriString* dst_path,
     bool copy,
     bool find_name);

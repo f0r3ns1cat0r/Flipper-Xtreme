@@ -6,14 +6,17 @@
 
 #include <storage.pb.h>
 #include <flipper.pb.h>
-#include <portmacro.h>
 
 #include <furi.h>
+#include <furi_hal.h>
 
 #include <cli/cli.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <m-dict.h>
+#include <xtreme/xtreme.h>
+
+#include <bt/bt_service/bt.h>
 
 #define TAG "RpcSrv"
 
@@ -86,6 +89,7 @@ struct RpcSession {
 
 struct Rpc {
     FuriMutex* busy_mutex;
+    size_t sessions_count;
 };
 
 RpcOwner rpc_session_get_owner(RpcSession* session) {
@@ -159,8 +163,11 @@ void rpc_session_set_terminated_callback(
  * command is gets processed - it's safe either way. But case of it is quite
  * odd: client sends close request and sends command after.
  */
-size_t
-    rpc_session_feed(RpcSession* session, uint8_t* encoded_bytes, size_t size, TickType_t timeout) {
+size_t rpc_session_feed(
+    RpcSession* session,
+    const uint8_t* encoded_bytes,
+    size_t size,
+    uint32_t timeout) {
     furi_assert(session);
     furi_assert(encoded_bytes);
 
@@ -316,6 +323,15 @@ static int32_t rpc_session_worker(void* context) {
                     session->closed_callback(session->context);
                 }
                 furi_mutex_release(session->callbacks_mutex);
+
+                if(session->owner == RpcOwnerBle) {
+                    // Disconnect BLE session
+                    FURI_LOG_E("RPC", "BLE session closed due to a decode error");
+                    Bt* bt = furi_record_open(RECORD_BT);
+                    bt_set_profile(bt, BtProfileSerial);
+                    furi_record_close(RECORD_BT);
+                    FURI_LOG_E("RPC", "Finished disconnecting the BLE session");
+                }
             }
         }
 
@@ -363,6 +379,9 @@ static void rpc_session_thread_state_callback(FuriThreadState thread_state, void
 }
 
 RpcSession* rpc_session_open(Rpc* rpc, RpcOwner owner) {
+    if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagLock) && !xtreme_settings.allow_locked_rpc_commands)
+        return NULL;
+
     furi_assert(rpc);
 
     RpcSession* session = malloc(sizeof(RpcSession));
@@ -397,12 +416,16 @@ RpcSession* rpc_session_open(Rpc* rpc, RpcOwner owner) {
 
     furi_thread_start(session->thread);
 
+    rpc->sessions_count++;
+
     return session;
 }
 
 void rpc_session_close(RpcSession* session) {
     furi_assert(session);
     furi_assert(session->rpc);
+
+    session->rpc->sessions_count--;
 
     rpc_session_set_send_bytes_callback(session, NULL);
     rpc_session_set_close_callback(session, NULL);
@@ -467,12 +490,19 @@ void rpc_send_and_release(RpcSession* session, PB_Main* message) {
 }
 
 void rpc_send_and_release_empty(RpcSession* session, uint32_t command_id, PB_CommandStatus status) {
+    furi_assert(session);
+
     PB_Main message = {
         .command_id = command_id,
         .command_status = status,
         .has_next = false,
         .which_content = PB_Main_empty_tag,
     };
+
     rpc_send_and_release(session, &message);
     pb_release(&PB_Main_msg, &message);
+}
+
+size_t rpc_get_sessions_count(Rpc* rpc) {
+    return rpc->sessions_count;
 }

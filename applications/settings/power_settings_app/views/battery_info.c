@@ -50,8 +50,7 @@ static void draw_battery(Canvas* canvas, BatteryInfoModel* data, int x, int y) {
             (uint32_t)(data->vbus_voltage * 10) % 10,
             current);
     } else if(current < -5) {
-        // Often gauge reports anything in the range 1~5ma as 5ma
-        // That brings confusion, so we'll treat it as Napping
+        // 0-5ma deadband
         snprintf(
             emote,
             sizeof(emote),
@@ -138,10 +137,10 @@ static void battery_info_draw_callback(Canvas* canvas, void* context) {
     if(model->alt) {
         elements_button_left(canvas, "Back");
         elements_button_right(canvas, "Next");
-        char uptime[17];
+        char uptime[15];
         uint32_t sec = furi_get_tick() / furi_kernel_get_tick_frequency();
         snprintf(
-            uptime, sizeof(uptime), "Up %02lu:%02lu:%02lu", sec / 3600, sec / 60 % 60, sec % 60);
+            uptime, sizeof(uptime), "%02luh%02lum%02lus", sec / 3600, sec / 60 % 60, sec % 60);
         canvas_draw_str_aligned(canvas, 64, 61, AlignCenter, AlignBottom, uptime);
     }
 }
@@ -152,7 +151,10 @@ static bool battery_info_input_callback(InputEvent* event, void* context) {
 
     BatteryInfo* battery_info = context;
 
-    if(event->type == InputTypeShort) {
+    bool about_battery;
+    with_view_model(
+        battery_info->view, BatteryInfoModel * model, { about_battery = model->alt; }, false);
+    if(about_battery && event->type == InputTypeShort) {
         if(event->key == InputKeyLeft) {
             event->key = InputKeyBack;
         } else if(event->key == InputKeyRight) {

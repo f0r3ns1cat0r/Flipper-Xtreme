@@ -1,10 +1,6 @@
 #pragma once
 #include "base.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define SUBGHZ_PROTOCOL_ALUTECH_AT_4N_NAME "Alutech AT-4N"
 
 typedef struct SubGhzProtocolDecoderAlutech_at_4n SubGhzProtocolDecoderAlutech_at_4n;
@@ -26,24 +22,6 @@ void* subghz_protocol_encoder_alutech_at_4n_alloc(SubGhzEnvironment* environment
  * @param context Pointer to a SubGhzProtocolEncoderAlutech_at_4n instance
  */
 void subghz_protocol_encoder_alutech_at_4n_free(void* context);
-
-/**
- * Key generation from simple data.
- * @param context Pointer to a SubGhzProtocolEncoderAlutech_at_4n instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @param serial Serial number, 24 bit
- * @param btn Button number, 8 bit
- * @param cnt Counter value, 16 bit
- * @param preset Modulation, SubGhzRadioPreset
- * @return true On success
- */
-bool subghz_protocol_alutech_at_4n_create_data(
-    void* context,
-    FlipperFormat* flipper_format,
-    uint32_t serial,
-    uint8_t btn,
-    uint16_t cnt,
-    SubGhzRadioPreset* preset);
 
 /**
  * Deserialize and generating an upload to send.
@@ -99,7 +77,7 @@ void subghz_protocol_decoder_alutech_at_4n_feed(void* context, bool level, uint3
  * @param context Pointer to a SubGhzProtocolDecoderAlutech_at_4n instance
  * @return hash Hash sum
  */
-uint8_t subghz_protocol_decoder_alutech_at_4n_get_hash_data(void* context);
+uint32_t subghz_protocol_decoder_alutech_at_4n_get_hash_data(void* context);
 
 /**
  * Serialize data SubGhzProtocolDecoderAlutech_at_4n.
@@ -128,7 +106,3 @@ SubGhzProtocolStatus
  * @param output Resulting text
  */
 void subghz_protocol_decoder_alutech_at_4n_get_string(void* context, FuriString* output);
-
-#ifdef __cplusplus
-}
-#endif

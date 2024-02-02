@@ -12,12 +12,12 @@ static bool archive_favorites_read_line(File* file, FuriString* str_result) {
     bool result = false;
 
     do {
-        uint16_t read_count = storage_file_read(file, buffer, ARCHIVE_FAV_FILE_BUF_LEN);
+        size_t read_count = storage_file_read(file, buffer, ARCHIVE_FAV_FILE_BUF_LEN);
         if(storage_file_get_error(file) != FSE_OK) {
             return false;
         }
 
-        for(uint16_t i = 0; i < read_count; i++) {
+        for(size_t i = 0; i < read_count; i++) {
             if(buffer[i] == '\n') {
                 uint32_t position = storage_file_tell(file);
                 if(storage_file_get_error(file) != FSE_OK) {
@@ -46,9 +46,7 @@ static bool archive_favorites_read_line(File* file, FuriString* str_result) {
     return result;
 }
 
-uint16_t archive_favorites_count(void* context) {
-    furi_assert(context);
-
+uint16_t archive_favorites_count() {
     Storage* fs_api = furi_record_open(RECORD_STORAGE);
     File* file = storage_file_alloc(fs_api);
 
@@ -59,10 +57,7 @@ uint16_t archive_favorites_count(void* context) {
     uint16_t lines = 0;
 
     if(result) {
-        while(1) {
-            if(!archive_favorites_read_line(file, buffer)) {
-                break;
-            }
+        while(archive_favorites_read_line(file, buffer)) {
             if(!furi_string_size(buffer)) {
                 continue; // Skip empty lines
             }
@@ -87,10 +82,7 @@ static bool archive_favourites_rescan() {
 
     bool result = storage_file_open(file, ARCHIVE_FAV_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
     if(result) {
-        while(1) {
-            if(!archive_favorites_read_line(file, buffer)) {
-                break;
-            }
+        while(archive_favorites_read_line(file, buffer)) {
             if(!furi_string_size(buffer)) {
                 continue;
             }
@@ -112,7 +104,9 @@ static bool archive_favourites_rescan() {
     furi_string_free(buffer);
 
     storage_file_close(file);
-    storage_common_move(storage, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(storage, ARCHIVE_FAV_PATH);
+    storage_common_rename(storage, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(storage, ARCHIVE_FAV_TEMP_PATH);
 
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
@@ -139,10 +133,7 @@ bool archive_favorites_read(void* context) {
     bool result = storage_file_open(file, ARCHIVE_FAV_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
 
     if(result) {
-        while(1) {
-            if(!archive_favorites_read_line(file, buffer)) {
-                break;
-            }
+        while(archive_favorites_read_line(file, buffer)) {
             if(!furi_string_size(buffer)) {
                 continue;
             }
@@ -197,10 +188,7 @@ bool archive_favorites_delete(const char* format, ...) {
     bool result = storage_file_open(file, ARCHIVE_FAV_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
 
     if(result) {
-        while(1) {
-            if(!archive_favorites_read_line(file, buffer)) {
-                break;
-            }
+        while(archive_favorites_read_line(file, buffer)) {
             if(!furi_string_size(buffer)) {
                 continue;
             }
@@ -215,7 +203,9 @@ bool archive_favorites_delete(const char* format, ...) {
     furi_string_free(filename);
 
     storage_file_close(file);
-    storage_common_move(fs_api, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(fs_api, ARCHIVE_FAV_PATH);
+    storage_common_rename(fs_api, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(fs_api, ARCHIVE_FAV_TEMP_PATH);
 
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
@@ -239,10 +229,7 @@ bool archive_is_favorite(const char* format, ...) {
     bool result = storage_file_open(file, ARCHIVE_FAV_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
 
     if(result) {
-        while(1) {
-            if(!archive_favorites_read_line(file, buffer)) {
-                break;
-            }
+        while(archive_favorites_read_line(file, buffer)) {
             if(!furi_string_size(buffer)) {
                 continue;
             }
@@ -279,10 +266,7 @@ bool archive_favorites_rename(const char* src, const char* dst) {
     bool result = storage_file_open(file, ARCHIVE_FAV_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
 
     if(result) {
-        while(1) {
-            if(!archive_favorites_read_line(file, buffer)) {
-                break;
-            }
+        while(archive_favorites_read_line(file, buffer)) {
             if(!furi_string_size(buffer)) {
                 continue;
             }
@@ -298,7 +282,9 @@ bool archive_favorites_rename(const char* src, const char* dst) {
     furi_string_free(path);
 
     storage_file_close(file);
-    storage_common_move(fs_api, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(fs_api, ARCHIVE_FAV_PATH);
+    storage_common_rename(fs_api, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(fs_api, ARCHIVE_FAV_TEMP_PATH);
 
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
@@ -324,7 +310,9 @@ void archive_favorites_save(void* context) {
         archive_file_append(ARCHIVE_FAV_TEMP_PATH, "%s\n", furi_string_get_cstr(item->path));
     }
 
-    storage_common_move(fs_api, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(fs_api, ARCHIVE_FAV_PATH);
+    storage_common_rename(fs_api, ARCHIVE_FAV_TEMP_PATH, ARCHIVE_FAV_PATH);
+    storage_common_remove(fs_api, ARCHIVE_FAV_TEMP_PATH);
 
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);

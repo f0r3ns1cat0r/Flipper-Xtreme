@@ -10,7 +10,7 @@
 #define RFID_DATA_BUFFER_SIZE 2048
 #define READ_DATA_BUFFER_COUNT 4
 
-#define TAG_EMULATE "RAW EMULATE"
+#define TAG_EMULATE "RawEmulate"
 
 // emulate mode
 typedef struct {
@@ -151,9 +151,7 @@ static int32_t lfrfid_raw_read_worker_thread(void* thread_context) {
 
     if(file_valid) {
         // setup carrier
-        furi_hal_rfid_pins_read();
-        furi_hal_rfid_tim_read(worker->frequency, worker->duty_cycle);
-        furi_hal_rfid_tim_read_start();
+        furi_hal_rfid_tim_read_start(worker->frequency, worker->duty_cycle);
 
         // stabilize detector
         furi_delay_ms(1500);

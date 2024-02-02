@@ -21,7 +21,8 @@ if __name__ == "__main__":
 
     artifacts = {
         os.environ['ARTIFACT_TGZ']: "application/gzip",
-        os.environ['ARTIFACT_ZIP']: "application/zip"
+        os.environ['ARTIFACT_ZIP']: "application/zip",
+        os.environ['ARTIFACT_SDK']: "application/zip",
     }
 
     for asset in release["assets"]:
@@ -59,7 +60,7 @@ if __name__ == "__main__":
 
     body = release["body"]
     body = re.sub(
-        r"(https://github\.com/ClaraCrazy/Flipper-Xtreme/releases/download/[A-Za-z0-9_-]+?/)[A-Za-z0-9_-]+",
+        r"(https://github\.com/Flipper-XFW/Xtreme-Firmware/releases/download/[A-Za-z0-9_-]+?/)[A-Za-z0-9_-]+",
         r"\1" + os.environ['VERSION_TAG'],
         body
     )
@@ -81,3 +82,7 @@ if __name__ == "__main__":
     if not req.ok:
         print(f"{req.url = }\n{req.status_code = }\n{req.content = }")
         sys.exit(1)
+
+    changelog = body.split("## 🚀 Changelog", 1)[1]
+    with open(os.environ["ARTIFACT_TGZ"].removesuffix(".tgz") + ".md", "w") as f:
+        f.write(changelog.strip() + "\n\n")

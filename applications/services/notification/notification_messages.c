@@ -197,6 +197,10 @@ const NotificationMessage message_force_display_brightness_setting_1f = {
     .data.forced_settings.display_brightness = 1.0f,
 };
 
+const NotificationMessage message_lcd_contrast_update = {
+    .type = NotificationMessageTypeLcdContrastUpdate,
+};
+
 /****************************** Message sequences ******************************/
 
 // Reset
@@ -515,6 +519,24 @@ const NotificationSequence sequence_success = {
     NULL,
 };
 
+const NotificationSequence sequence_semi_success = {
+    &message_display_backlight_on,
+    &message_green_255,
+    &message_vibro_on,
+    &message_note_c4,
+    &message_delay_50,
+    &message_note_e4,
+    &message_delay_50,
+    &message_note_g4,
+    &message_delay_50,
+    &message_sound_off,
+    &message_delay_50,
+    &message_note_c5,
+    &message_delay_50,
+    &message_sound_off,
+    NULL,
+};
+
 const NotificationSequence sequence_error = {
     &message_display_backlight_on,
     &message_red_255,
@@ -564,5 +586,10 @@ const NotificationSequence sequence_audiovisual_alert = {
 
     &message_sound_off,
     &message_vibro_off,
+    NULL,
+};
+
+const NotificationSequence sequence_lcd_contrast_update = {
+    &message_lcd_contrast_update,
     NULL,
 };

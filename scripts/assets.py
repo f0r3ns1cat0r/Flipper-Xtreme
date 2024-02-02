@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-import pathlib
+import shutil
 
-import asset_packer
 from flipper.app import App
 from flipper.assets.icon import file2image
 
@@ -25,6 +24,9 @@ ICONS_TEMPLATE_C_HEADER = """#include "{assets_filename}.h"
 ICONS_TEMPLATE_C_FRAME = "const uint8_t {name}[] = {data};\n"
 ICONS_TEMPLATE_C_DATA = "const uint8_t* const {name}[] = {data};\n"
 ICONS_TEMPLATE_C_ICONS = "Icon {name} = {{.width={width},.height={height},.frame_count={frame_count},.frame_rate={frame_rate},.frames=_{name}}};\n"
+
+MAX_IMAGE_WIDTH = 128
+MAX_IMAGE_HEIGHT = 64
 
 
 class Main(App):
@@ -102,8 +104,21 @@ class Main(App):
         )
         self.parser_dolphin.set_defaults(func=self.dolphin)
 
+        self.parser_packs = self.subparsers.add_parser(
+            "packs", help="Assemble asset packs"
+        )
+        self.parser_packs.add_argument("input_directory", help="Packs source directory")
+        self.parser_packs.add_argument(
+            "output_directory", help="Packs output directory"
+        )
+        self.parser_packs.set_defaults(func=self.packs)
+
     def _icon2header(self, file):
         image = file2image(file)
+        if image.width > MAX_IMAGE_WIDTH or image.height > MAX_IMAGE_HEIGHT:
+            raise Exception(
+                f"Image {file} is too big ({image.width}x{image.height} vs. {MAX_IMAGE_WIDTH}x{MAX_IMAGE_HEIGHT})"
+            )
         return image.width, image.height, image.data_as_carray()
 
     def _iconIsSupported(self, filename):
@@ -255,6 +270,7 @@ extern const size_t ICON_PATHS_COUNT;
         if not os.path.isdir(directory_path):
             self.logger.error(f'"{directory_path}" is not a directory')
             exit(255)
+
         manifest_file = os.path.join(directory_path, "Manifest")
         old_manifest = Manifest()
         if os.path.exists(manifest_file):
@@ -269,24 +285,18 @@ extern const size_t ICON_PATHS_COUNT;
         self.logger.info("Comparing new manifest with existing")
         only_in_old, changed, only_in_new = Manifest.compare(old_manifest, new_manifest)
         for record in only_in_old:
-            self.logger.info(f"Only in old: {record}")
+            self.logger.debug(f"Only in old: {record}")
         for record in changed:
             self.logger.info(f"Changed: {record}")
         for record in only_in_new:
-            self.logger.info(f"Only in new: {record}")
+            self.logger.debug(f"Only in new: {record}")
         if any((only_in_old, changed, only_in_new)):
-            self.logger.warning("Manifests are different, updating")
+            self.logger.info(
+                f"Manifest updated ({len(only_in_new)} new, {len(only_in_old)} removed, {len(changed)} changed)"
+            )
             new_manifest.save(manifest_file)
         else:
             self.logger.info("Manifest is up-to-date!")
-
-        self.logger.info("Packing custom asset packs")
-        root_dir = pathlib.Path(__file__).absolute().parent.parent
-        asset_packer.pack(
-            root_dir / "assets/dolphin/custom",
-            root_dir / f"assets/resources/dolphin_custom",
-            self.logger.info,
-        )
 
         self.logger.info("Complete")
 
@@ -324,6 +334,19 @@ extern const size_t ICON_PATHS_COUNT;
         self.logger.info("Packing")
         dolphin.pack(self.args.output_directory, self.args.symbol_name)
         self.logger.info("Complete")
+
+        return 0
+
+    def packs(self):
+        import asset_packer
+
+        self.logger.info("Packing custom asset packs")
+        asset_packer.pack(
+            self.args.input_directory,
+            self.args.output_directory,
+            self.logger.info,
+        )
+        self.logger.info("Finished custom asset packs")
 
         return 0
 

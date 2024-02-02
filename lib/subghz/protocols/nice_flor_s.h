@@ -2,10 +2,6 @@
 
 #include "base.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME "Nice FloR-S"
 
 typedef struct SubGhzProtocolDecoderNiceFlorS SubGhzProtocolDecoderNiceFlorS;
@@ -53,26 +49,6 @@ LevelDuration subghz_protocol_encoder_nice_flor_s_yield(void* context);
 uint64_t subghz_protocol_nice_flor_s_encrypt(uint64_t data, const char* file_name);
 
 /**
- * New remote generation.
- * @param context Pointer to a SubGhzProtocolEncoderNiceFlorS instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @param serial Serial number
- * @param btn Button number, 4 bit
- * @param cnt Counter value, 16 bit
- * @param preset Modulation, SubGhzRadioPreset
- * @param nice_one Nice One if true, Nice Flor S if false
- * @return true On success
- */
-bool subghz_protocol_nice_flor_s_create_data(
-    void* context,
-    FlipperFormat* flipper_format,
-    uint32_t serial,
-    uint8_t btn,
-    uint16_t cnt,
-    SubGhzRadioPreset* preset,
-    bool nice_one);
-
-/**
  * Allocate SubGhzProtocolDecoderNiceFlorS.
  * @param environment Pointer to a SubGhzEnvironment instance
  * @return SubGhzProtocolDecoderNiceFlorS* pointer to a SubGhzProtocolDecoderNiceFlorS instance
@@ -104,7 +80,7 @@ void subghz_protocol_decoder_nice_flor_s_feed(void* context, bool level, uint32_
  * @param context Pointer to a SubGhzProtocolDecoderNiceFlorS instance
  * @return hash Hash sum
  */
-uint8_t subghz_protocol_decoder_nice_flor_s_get_hash_data(void* context);
+uint32_t subghz_protocol_decoder_nice_flor_s_get_hash_data(void* context);
 
 /**
  * Serialize data SubGhzProtocolDecoderNiceFlorS.
@@ -133,7 +109,3 @@ SubGhzProtocolStatus
  * @param output Resulting text
  */
 void subghz_protocol_decoder_nice_flor_s_get_string(void* context, FuriString* output);
-
-#ifdef __cplusplus
-}
-#endif

@@ -25,17 +25,6 @@ typedef enum {
     PowerEventTypeBatteryLevelChanged,
 } PowerEventType;
 
-typedef enum {
-    BatteryIconOff,
-    BatteryIconBar,
-    BatteryIconPercent,
-    BatteryIconInvertedPercent,
-    BatteryIconRetro3,
-    BatteryIconRetro5,
-    BatteryIconBarPercent,
-    BatteryIconCount,
-} BatteryIcon;
-
 typedef union {
     uint8_t battery_level;
 } PowerEventData;
@@ -48,6 +37,7 @@ typedef struct {
 typedef struct {
     bool gauge_is_ok;
     bool is_charging;
+    bool is_shutdown_requested;
 
     float current_charger;
     float current_gauge;
@@ -65,6 +55,8 @@ typedef struct {
 
     uint8_t charge;
     uint8_t health;
+
+    bool is_charge_capped;
 } PowerInfo;
 
 /** Power off device
@@ -118,6 +110,13 @@ void power_enable_low_battery_level_notification(Power* power, bool enable);
  * @param power     Power instance
  */
 void power_trigger_ui_update(Power* power);
+
+/** Enable or disable battery icon
+ *
+ * @param power         Power instance
+ * @param is_enabled    Show battery or not
+ */
+void power_set_battery_icon_enabled(Power* power, bool is_enabled);
 
 #ifdef __cplusplus
 }

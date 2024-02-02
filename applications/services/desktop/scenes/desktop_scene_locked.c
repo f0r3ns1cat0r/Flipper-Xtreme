@@ -3,7 +3,6 @@
 #include <gui/scene_manager.h>
 #include <gui/view_stack.h>
 #include <stdint.h>
-#include <portmacro.h>
 
 #include "../desktop.h"
 #include "../desktop_i.h"
@@ -14,6 +13,9 @@
 #include "../views/desktop_view_locked.h"
 #include "desktop_scene.h"
 #include "desktop_scene_i.h"
+#include <xtreme/xtreme.h>
+
+#define TAG "DesktopSrv"
 
 #define WRONG_PIN_HEADER_TIMEOUT 3000
 #define INPUT_PIN_VIEW_TIMEOUT 15000
@@ -52,7 +54,6 @@ void desktop_scene_locked_on_enter(void* context) {
         furi_record_close(RECORD_GUI);
 
         if(pin_locked) {
-            DESKTOP_SETTINGS_LOAD(&desktop->settings);
             desktop_view_locked_lock(desktop->locked_view, true);
             uint32_t pin_timeout = desktop_pin_lock_get_fail_timeout();
             if(pin_timeout > 0) {
@@ -83,8 +84,20 @@ bool desktop_scene_locked_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
+        case DesktopLockedEventOpenPowerOff: {
+            if(xtreme_settings.lockscreen_poweroff) {
+                loader_start(desktop->loader, "Power", "off", NULL);
+            }
+            consumed = true;
+            break;
+        }
         case DesktopLockedEventUnlocked:
+        case DesktopGlobalApiUnlock:
             desktop_unlock(desktop);
+            consumed = true;
+            break;
+        case DesktopLockedEventCoversClosed:
+            notification_message(desktop->notification, &sequence_display_backlight_off);
             consumed = true;
             break;
         case DesktopLockedEventUpdate:

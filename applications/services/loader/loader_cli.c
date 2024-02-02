@@ -2,6 +2,7 @@
 #include <cli/cli.h>
 #include <applications.h>
 #include <lib/toolbox/args.h>
+#include <notification/notification_messages.h>
 #include "loader.h"
 
 static void loader_cli_print_usage() {
@@ -14,9 +15,12 @@ static void loader_cli_print_usage() {
 }
 
 static void loader_cli_list() {
-    printf("Applications:\r\n");
+    printf("Apps:\r\n");
     for(size_t i = 0; i < FLIPPER_APPS_COUNT; i++) {
         printf("\t%s\r\n", FLIPPER_APPS[i].name);
+    }
+    for(size_t i = 0; i < FLIPPER_EXTERNAL_APPS_COUNT; i++) {
+        printf("\t%s\r\n", FLIPPER_EXTERNAL_APPS[i].name);
     }
     printf("Settings:\r\n");
     for(size_t i = 0; i < FLIPPER_SETTINGS_APPS_COUNT; i++) {
@@ -28,7 +32,7 @@ static void loader_cli_info(Loader* loader) {
     if(!loader_is_locked(loader)) {
         printf("No application is running\r\n");
     } else {
-        // TODO: print application name ???
+        // TODO FL-3513: print application name ???
         printf("Application is running\r\n");
     }
 }
@@ -50,21 +54,15 @@ static void loader_cli_open(FuriString* args, Loader* loader) {
 
         const char* app_name_str = furi_string_get_cstr(app_name);
 
-        LoaderStatus status = loader_start(loader, app_name_str, args_str);
-
-        switch(status) {
-        case LoaderStatusOk:
-            break;
-        case LoaderStatusErrorAppStarted:
-            printf("Can't start, application is running");
-            break;
-        case LoaderStatusErrorUnknownApp:
-            printf("%s doesn't exists\r\n", app_name_str);
-            break;
-        case LoaderStatusErrorInternal:
-            printf("Internal error\r\n");
-            break;
+        FuriString* error_message = furi_string_alloc();
+        if(loader_start(loader, app_name_str, args_str, error_message) != LoaderStatusOk) {
+            printf("%s\r\n", furi_string_get_cstr(error_message));
+        } else {
+            NotificationApp* notifications = furi_record_open(RECORD_NOTIFICATION);
+            notification_message(notifications, &sequence_display_backlight_on);
+            furi_record_close(RECORD_NOTIFICATION);
         }
+        furi_string_free(error_message);
     } while(false);
 
     furi_string_free(app_name);

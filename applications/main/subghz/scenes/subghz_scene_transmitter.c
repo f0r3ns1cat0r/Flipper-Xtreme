@@ -1,11 +1,11 @@
 #include "../subghz_i.h"
 #include "../views/transmitter.h"
 #include <dolphin/dolphin.h>
-#include <xtreme.h>
-#include <lib/subghz/protocols/keeloq.h>
-#include <lib/subghz/protocols/star_line.h>
+#include <xtreme/xtreme.h>
 
 #include <lib/subghz/blocks/custom_btn.h>
+
+#define TAG "SubGhzSceneTransmitter"
 
 void subghz_scene_transmitter_callback(SubGhzCustomEvent event, void* context) {
     furi_assert(context);
@@ -41,6 +41,8 @@ bool subghz_scene_transmitter_update_data_show(void* context) {
         furi_string_free(modulation_str);
         furi_string_free(key_str);
     }
+    subghz_view_transmitter_set_radio_device_type(
+        subghz->subghz_transmitter, subghz_txrx_radio_device_get(subghz->txrx));
     return ret;
 }
 
@@ -53,7 +55,6 @@ void fav_timer_callback(void* context) {
 void subghz_scene_transmitter_on_enter(void* context) {
     SubGhz* subghz = context;
 
-    keeloq_reset_original_btn();
     subghz_custom_btns_reset();
 
     if(!subghz_scene_transmitter_update_data_show(subghz)) {
@@ -69,19 +70,12 @@ void subghz_scene_transmitter_on_enter(void* context) {
 
     // Auto send and exit with favorites
     if(subghz->fav_timeout) {
-        subghz_custom_btn_set(0);
+        furi_check(!subghz->timer, "SubGhz fav timer exists");
+        subghz->timer = furi_timer_alloc(fav_timer_callback, FuriTimerTypeOnce, subghz);
         scene_manager_handle_custom_event(
             subghz->scene_manager, SubGhzCustomEventViewTransmitterSendStart);
-        with_view_model(
-            subghz->subghz_transmitter->view,
-            SubGhzViewTransmitterModel * model,
-            { model->show_button = false; },
-            true);
-        subghz->fav_timer = furi_timer_alloc(fav_timer_callback, FuriTimerTypeOnce, subghz);
         furi_timer_start(
-            subghz->fav_timer,
-            XTREME_SETTINGS()->favorite_timeout * furi_kernel_get_tick_frequency());
-        subghz->state_notifications = SubGhzNotificationStateTx;
+            subghz->timer, xtreme_settings.favorite_timeout * furi_kernel_get_tick_frequency());
     }
 }
 
@@ -94,7 +88,7 @@ bool subghz_scene_transmitter_on_event(void* context, SceneManagerEvent event) {
             if(subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx))) {
                 subghz->state_notifications = SubGhzNotificationStateTx;
                 subghz_scene_transmitter_update_data_show(subghz);
-                DOLPHIN_DEED(DolphinDeedSubGhzSend);
+                dolphin_deed(DolphinDeedSubGhzSend);
             }
             return true;
         } else if(event.event == SubGhzCustomEventViewTransmitterSendStop) {
@@ -102,9 +96,13 @@ bool subghz_scene_transmitter_on_event(void* context, SceneManagerEvent event) {
             subghz_txrx_stop(subghz->txrx);
             if(subghz_custom_btn_get() != SUBGHZ_CUSTOM_BTN_OK) {
                 subghz_custom_btn_set(SUBGHZ_CUSTOM_BTN_OK);
-                uint8_t tmp_counter = furi_hal_subghz_get_rolling_counter_mult();
+                int8_t tmp_counter = furi_hal_subghz_get_rolling_counter_mult();
                 furi_hal_subghz_set_rolling_counter_mult(0);
                 // Calling restore!
+                subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx));
+                subghz_txrx_stop(subghz->txrx);
+                // Calling restore 2nd time special for FAAC SLH!
+                // TODO: Find better way to restore after custom button is used!!!
                 subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx));
                 subghz_txrx_stop(subghz->txrx);
                 furi_hal_subghz_set_rolling_counter_mult(tmp_counter);
@@ -136,10 +134,6 @@ bool subghz_scene_transmitter_on_event(void* context, SceneManagerEvent event) {
 void subghz_scene_transmitter_on_exit(void* context) {
     SubGhz* subghz = context;
     subghz->state_notifications = SubGhzNotificationStateIDLE;
-    keeloq_reset_mfname();
-    keeloq_reset_kl_type();
-    keeloq_reset_original_btn();
-    subghz_custom_btns_reset();
-    star_line_reset_mfname();
-    star_line_reset_kl_type();
+
+    subghz_txrx_reset_dynamic_and_custom_btns(subghz->txrx);
 }

@@ -3,13 +3,13 @@
 
 #include <cli/cli.h>
 #include <lib/toolbox/args.h>
-#include <lib/toolbox/md5.h>
+#include <lib/toolbox/md5_calc.h>
 #include <lib/toolbox/dir_walk.h>
 #include <storage/storage.h>
 #include <storage/storage_sd_api.h>
 #include <power/power_service/power.h>
 
-#define MAX_NAME_LENGTH 255
+#define MAX_NAME_LENGTH 254
 
 static void storage_cli_print_usage() {
     printf("Usage:\r\n");
@@ -29,6 +29,8 @@ static void storage_cli_print_usage() {
         "\twrite_chunk\t - read data from cli and append it to file, <args> should contain how many bytes you want to write\r\n");
     printf("\tcopy\t - copy file to new file, <args> must contain new path\r\n");
     printf("\trename\t - move file to new file, <args> must contain new path\r\n");
+    printf(
+        "\tmigrate\t - move folder to new path, renaming already present files by adding numbers to the end\r\n");
     printf("\tmkdir\t - creates a new directory\r\n");
     printf("\tmd5\t - md5 hash of the file\r\n");
     printf("\tstat\t - info about file or dir\r\n");
@@ -198,15 +200,15 @@ static void storage_cli_read(Cli* cli, FuriString* path) {
     File* file = storage_file_alloc(api);
 
     if(storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
-        const uint16_t buffer_size = 128;
-        uint16_t read_size = 0;
+        const size_t buffer_size = 128;
+        size_t read_size = 0;
         uint8_t* data = malloc(buffer_size);
 
         printf("Size: %lu\r\n", (uint32_t)storage_file_size(file));
 
         do {
             read_size = storage_file_read(file, data, buffer_size);
-            for(uint16_t i = 0; i < read_size; i++) {
+            for(size_t i = 0; i < read_size; i++) {
                 printf("%c", data[i]);
             }
         } while(read_size > 0);
@@ -227,7 +229,7 @@ static void storage_cli_write(Cli* cli, FuriString* path) {
     Storage* api = furi_record_open(RECORD_STORAGE);
     File* file = storage_file_alloc(api);
 
-    const uint16_t buffer_size = 512;
+    const size_t buffer_size = 512;
     uint8_t* buffer = malloc(buffer_size);
 
     if(storage_file_open(file, furi_string_get_cstr(path), FSAM_WRITE, FSOM_OPEN_APPEND)) {
@@ -239,10 +241,10 @@ static void storage_cli_write(Cli* cli, FuriString* path) {
             uint8_t symbol = cli_getc(cli);
 
             if(symbol == CliSymbolAsciiETX) {
-                uint16_t write_size = read_index % buffer_size;
+                size_t write_size = read_index % buffer_size;
 
                 if(write_size > 0) {
-                    uint16_t written_size = storage_file_write(file, buffer, write_size);
+                    size_t written_size = storage_file_write(file, buffer, write_size);
 
                     if(written_size != write_size) {
                         storage_cli_print_error(storage_file_get_error(file));
@@ -257,7 +259,7 @@ static void storage_cli_write(Cli* cli, FuriString* path) {
             read_index++;
 
             if(((read_index % buffer_size) == 0)) {
-                uint16_t written_size = storage_file_write(file, buffer, buffer_size);
+                size_t written_size = storage_file_write(file, buffer, buffer_size);
 
                 if(written_size != buffer_size) {
                     storage_cli_print_error(storage_file_get_error(file));
@@ -289,7 +291,7 @@ static void storage_cli_read_chunks(Cli* cli, FuriString* path, FuriString* args
     } else if(storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
         uint64_t file_size = storage_file_size(file);
 
-        printf("Size: %lu\r\n", (uint32_t)file_size);
+        printf("Size: %llu\r\n", file_size);
 
         if(buffer_size) {
             uint8_t* data = malloc(buffer_size);
@@ -297,8 +299,8 @@ static void storage_cli_read_chunks(Cli* cli, FuriString* path, FuriString* args
                 printf("\r\nReady?\r\n");
                 cli_getc(cli);
 
-                uint16_t read_size = storage_file_read(file, data, buffer_size);
-                for(uint16_t i = 0; i < read_size; i++) {
+                size_t read_size = storage_file_read(file, data, buffer_size);
+                for(size_t i = 0; i < read_size; i++) {
                     putchar(data[i]);
                 }
                 file_size -= read_size;
@@ -333,11 +335,9 @@ static void storage_cli_write_chunk(Cli* cli, FuriString* path, FuriString* args
             if(buffer_size) {
                 uint8_t* buffer = malloc(buffer_size);
 
-                for(uint32_t i = 0; i < buffer_size; i++) {
-                    buffer[i] = cli_getc(cli);
-                }
+                size_t read_bytes = cli_read(cli, buffer, buffer_size);
 
-                uint16_t written_size = storage_file_write(file, buffer, buffer_size);
+                size_t written_size = storage_file_write(file, buffer, read_bytes);
 
                 if(written_size != buffer_size) {
                     storage_cli_print_error(storage_file_get_error(file));
@@ -454,7 +454,28 @@ static void storage_cli_rename(Cli* cli, FuriString* old_path, FuriString* args)
     if(!args_read_probably_quoted_string_and_trim(args, new_path)) {
         storage_cli_print_usage();
     } else {
-        FS_Error error = storage_common_rename(
+        FS_Error error = storage_common_rename_safe(
+            api, furi_string_get_cstr(old_path), furi_string_get_cstr(new_path));
+
+        if(error != FSE_OK) {
+            storage_cli_print_error(error);
+        }
+    }
+
+    furi_string_free(new_path);
+    furi_record_close(RECORD_STORAGE);
+}
+
+static void storage_cli_migrate(Cli* cli, FuriString* old_path, FuriString* args) {
+    UNUSED(cli);
+    Storage* api = furi_record_open(RECORD_STORAGE);
+    FuriString* new_path;
+    new_path = furi_string_alloc();
+
+    if(!args_read_probably_quoted_string_and_trim(args, new_path)) {
+        storage_cli_print_usage();
+    } else {
+        FS_Error error = storage_common_migrate(
             api, furi_string_get_cstr(old_path), furi_string_get_cstr(new_path));
 
         if(error != FSE_OK) {
@@ -482,34 +503,16 @@ static void storage_cli_md5(Cli* cli, FuriString* path) {
     UNUSED(cli);
     Storage* api = furi_record_open(RECORD_STORAGE);
     File* file = storage_file_alloc(api);
+    FuriString* md5 = furi_string_alloc();
+    FS_Error file_error;
 
-    if(storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
-        const uint16_t buffer_size = 512;
-        const uint8_t hash_size = 16;
-        uint8_t* data = malloc(buffer_size);
-        uint8_t* hash = malloc(sizeof(uint8_t) * hash_size);
-        md5_context* md5_ctx = malloc(sizeof(md5_context));
-
-        md5_starts(md5_ctx);
-        while(true) {
-            uint16_t read_size = storage_file_read(file, data, buffer_size);
-            if(read_size == 0) break;
-            md5_update(md5_ctx, data, read_size);
-        }
-        md5_finish(md5_ctx, hash);
-        free(md5_ctx);
-
-        for(uint8_t i = 0; i < hash_size; i++) {
-            printf("%02x", hash[i]);
-        }
-        printf("\r\n");
-
-        free(hash);
-        free(data);
+    if(md5_string_calc_file(file, furi_string_get_cstr(path), md5, &file_error)) {
+        printf("%s\r\n", furi_string_get_cstr(md5));
     } else {
-        storage_cli_print_error(storage_file_get_error(file));
+        storage_cli_print_error(file_error);
     }
 
+    furi_string_free(md5);
     storage_file_close(file);
     storage_file_free(file);
 
@@ -589,6 +592,11 @@ void storage_cli(Cli* cli, FuriString* args, void* context) {
             break;
         }
 
+        if(furi_string_cmp_str(cmd, "migrate") == 0) {
+            storage_cli_migrate(cli, path, args);
+            break;
+        }
+
         if(furi_string_cmp_str(cmd, "mkdir") == 0) {
             storage_cli_mkdir(cli, path);
             break;
@@ -623,7 +631,8 @@ static void storage_cli_factory_reset(Cli* cli, FuriString* args, void* context)
     char c = cli_getc(cli);
     if(c == 'y' || c == 'Y') {
         printf("Data will be wiped after reboot.\r\n");
-        furi_hal_rtc_set_flag(FuriHalRtcFlagFactoryReset);
+        furi_hal_rtc_reset_registers();
+        furi_hal_rtc_set_flag(FuriHalRtcFlagStorageFormatInternal);
         power_reboot(PowerBootModeNormal);
     } else {
         printf("Safe choice.\r\n");

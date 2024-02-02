@@ -6,7 +6,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 
-#define TAG "SubGhzProtocoKIA"
+#define TAG "SubGhzProtocoKia"
 
 static const SubGhzBlockConst subghz_protocol_kia_const = {
     .te_short = 250,
@@ -67,6 +67,8 @@ const SubGhzProtocol subghz_protocol_kia = {
 
     .decoder = &subghz_protocol_kia_decoder,
     .encoder = &subghz_protocol_kia_encoder,
+
+    .filter = SubGhzProtocolFilter_AutoAlarms,
 };
 
 void* subghz_protocol_decoder_kia_alloc(SubGhzEnvironment* environment) {
@@ -223,10 +225,10 @@ static void subghz_protocol_kia_check_remote_controller(SubGhzBlockGeneric* inst
     instance->cnt = (instance->data >> 40) & 0xFFFF;
 }
 
-uint8_t subghz_protocol_decoder_kia_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_kia_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderKIA* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
+    return subghz_protocol_blocks_get_hash_data_long(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 

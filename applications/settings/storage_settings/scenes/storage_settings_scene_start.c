@@ -6,7 +6,8 @@ enum StorageSettingsStartSubmenuIndex {
     StorageSettingsStartSubmenuIndexUnmount,
     StorageSettingsStartSubmenuIndexFormat,
     StorageSettingsStartSubmenuIndexBenchy,
-    StorageSettingsStartSubmenuIndexFactoryReset
+    StorageSettingsStartSubmenuIndexFactoryReset,
+    StorageSettingsStartSubmenuIndexWipeDevice,
 };
 
 static void storage_settings_scene_start_submenu_callback(void* context, uint32_t index) {
@@ -31,12 +32,24 @@ void storage_settings_scene_start_on_enter(void* context) {
         StorageSettingsStartSubmenuIndexSDInfo,
         storage_settings_scene_start_submenu_callback,
         app);
-    submenu_add_item(
-        submenu,
-        "Unmount SD Card",
-        StorageSettingsStartSubmenuIndexUnmount,
-        storage_settings_scene_start_submenu_callback,
-        app);
+
+    FS_Error sd_status = storage_sd_status(app->fs_api);
+    if(sd_status != FSE_OK) {
+        submenu_add_item(
+            submenu,
+            "Mount SD Card",
+            StorageSettingsStartSubmenuIndexUnmount,
+            storage_settings_scene_start_submenu_callback,
+            app);
+    } else {
+        submenu_add_item(
+            submenu,
+            "Unmount SD Card",
+            StorageSettingsStartSubmenuIndexUnmount,
+            storage_settings_scene_start_submenu_callback,
+            app);
+    }
+
     submenu_add_item(
         submenu,
         "Format SD Card",
@@ -53,6 +66,12 @@ void storage_settings_scene_start_on_enter(void* context) {
         submenu,
         "Factory Reset",
         StorageSettingsStartSubmenuIndexFactoryReset,
+        storage_settings_scene_start_submenu_callback,
+        app);
+    submenu_add_item(
+        submenu,
+        "Wipe Device",
+        StorageSettingsStartSubmenuIndexWipeDevice,
         storage_settings_scene_start_submenu_callback,
         app);
 
@@ -106,6 +125,14 @@ bool storage_settings_scene_start_on_event(void* context, SceneManagerEvent even
                 StorageSettingsStart,
                 StorageSettingsStartSubmenuIndexFactoryReset);
             scene_manager_next_scene(app->scene_manager, StorageSettingsFactoryReset);
+            consumed = true;
+            break;
+        case StorageSettingsStartSubmenuIndexWipeDevice:
+            scene_manager_set_scene_state(
+                app->scene_manager,
+                StorageSettingsStart,
+                StorageSettingsStartSubmenuIndexWipeDevice);
+            scene_manager_next_scene(app->scene_manager, StorageSettingsWipeDevice);
             consumed = true;
             break;
         }

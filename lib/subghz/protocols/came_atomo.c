@@ -7,7 +7,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 
-#include "../blocks/custom_btn.h"
+#include "../blocks/custom_btn_i.h"
 
 #define TAG "SubGhzProtocoCameAtomo"
 
@@ -186,7 +186,7 @@ static void subghz_protocol_encoder_came_atomo_get_upload(
     uint8_t pack[8] = {};
 
     if(instance->generic.cnt < 0xFFFF) {
-        if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) >= 0xFFFF) {
+        if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) > 0xFFFF) {
             instance->generic.cnt = 0;
         } else {
             instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
@@ -682,10 +682,10 @@ static uint8_t subghz_protocol_came_atomo_get_btn_code() {
     return btn;
 }
 
-uint8_t subghz_protocol_decoder_came_atomo_get_hash_data(void* context) {
+uint32_t subghz_protocol_decoder_came_atomo_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderCameAtomo* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
+    return subghz_protocol_blocks_get_hash_data_long(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 
@@ -718,7 +718,7 @@ void subghz_protocol_decoder_came_atomo_get_string(void* context, FuriString* ou
     furi_string_cat_printf(
         output,
         "%s %db\r\n"
-        "Key:0x%08lX%08lX\r\n"
+        "Key:%08lX%08lX\r\n"
         "Sn:0x%08lX       Btn:%01X\r\n"
         "Pcl_Cnt:0x%04lX\r\n"
         "Btn_Cnt:0x%02X",

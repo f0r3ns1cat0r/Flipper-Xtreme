@@ -69,7 +69,9 @@ void gpio_scene_start_on_enter(void* context) {
         GpioOtgSettingsNum,
         gpio_scene_start_var_list_change_callback,
         app);
-    if(furi_hal_power_is_otg_enabled()) {
+    if(furi_hal_power_is_charging()) {
+        variable_item_set_locked(item, true, "Unplug USB!");
+    } else if(furi_hal_power_is_otg_enabled()) {
         variable_item_set_current_value_index(item, GpioOtgOn);
         variable_item_set_current_value_text(item, gpio_otg_text[GpioOtgOn]);
     } else {
@@ -107,7 +109,7 @@ bool gpio_scene_start_on_event(void* context, SceneManagerEvent event) {
         } else if(event.event == GpioStartEventUsbUart) {
             scene_manager_set_scene_state(app->scene_manager, GpioSceneStart, GpioItemUsbUart);
             if(!furi_hal_usb_is_locked()) {
-                DOLPHIN_DEED(DolphinDeedGpioUartBridge);
+                dolphin_deed(DolphinDeedGpioUartBridge);
                 scene_manager_next_scene(app->scene_manager, GpioSceneUsbUart);
             } else {
                 scene_manager_next_scene(app->scene_manager, GpioSceneUsbUartCloseRpc);
